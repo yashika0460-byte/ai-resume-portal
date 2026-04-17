@@ -1,0 +1,137 @@
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type UserSummary = 
+ record {
+   createdAt: int;
+   email: text;
+   role: text;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type Timestamp = int;
+type SessionToken = text;
+type SessionResult = 
+ variant {
+   err: text;
+   ok: LoginSuccess;
+ };
+type ResumeResult = 
+ variant {
+   err: text;
+   ok: Resume;
+ };
+type ResumeId = text;
+type Resume = 
+ record {
+   "blob": ExternalBlob;
+   filename: text;
+   id: ResumeId;
+   score: nat;
+   skills: vec text;
+   uploadDate: Timestamp;
+   uploadedBy: text;
+ };
+type RegisterResult = 
+ variant {
+   err: RegisterError;
+   ok: LoginSuccess;
+ };
+type RegisterError = 
+ variant {
+   duplicateEmail;
+   invalidInput;
+ };
+type MatchResult = 
+ variant {
+   err: text;
+   ok: MatchRecord;
+ };
+type MatchRecord = 
+ record {
+   id: MatchId;
+   jobDescription: text;
+   matchDate: Timestamp;
+   matchScore: nat;
+   matchedSkills: vec text;
+   missingSkills: vec text;
+   resumeId: ResumeId;
+   resumeName: text;
+ };
+type MatchId = text;
+type LoginSuccess = 
+ record {
+   role: text;
+   token: SessionToken;
+ };
+type LoginResult = 
+ variant {
+   err: LoginError;
+   ok: LoginSuccess;
+ };
+type LoginError = variant {invalidCredentials;};
+type ExternalBlob = blob;
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initializeAccessControl: () -> ();
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  computeScore: (skills: vec text) -> (nat) query;
+  deleteResume: (sessionToken: text, resumeId: ResumeId) -> (bool);
+  deleteUser: (token: SessionToken, email: text) -> (variant {
+                                                       err: text;
+                                                       ok;
+                                                     });
+  extractSkillsFromText: ("text": text) -> (vec text) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getMatchHistory: () -> (vec MatchRecord) query;
+  getResumeMatchHistory: (resumeId: ResumeId) -> (vec MatchRecord) query;
+  getResumes: () -> (vec Resume) query;
+  getSecurityQuestion: (email: text) -> (opt text);
+  getUserResumes: (sessionToken: text) -> (vec Resume);
+  isCallerAdmin: () -> (bool) query;
+  listUsers: (token: SessionToken) ->
+   (variant {
+      err: text;
+      ok: vec UserSummary;
+    });
+  login: (email: text, password: text) -> (LoginResult);
+  logout: (token: SessionToken) -> (bool);
+  matchResume: (sessionToken: text, resumeId: ResumeId, jobDescription:
+   text) -> (MatchResult);
+  register: (email: text, password: text) -> (RegisterResult);
+  resetPasswordBySecurityQuestion: (email: text, answer: text, newPassword:
+   text) -> (variant {
+               err: text;
+               ok;
+             });
+  setSecurityQuestion: (token: SessionToken, question: text, answer: 
+   text) -> (variant {
+               err: text;
+               ok;
+             });
+  uploadResume: (sessionToken: text, filename: text, "blob": ExternalBlob) ->
+   (ResumeResult);
+  validateSession: (token: SessionToken) -> (SessionResult);
+}

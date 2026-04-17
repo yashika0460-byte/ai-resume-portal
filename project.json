@@ -1,0 +1,25 @@
+{
+  "overview": "AI Resume Screening Portal — upload PDF resumes, extract and score skills, match against job descriptions, and manage candidates via an admin dashboard with analytics, CSV export, and role-based access.",
+  "features": [
+    "PDF resume upload with drag-and-drop",
+    "44-skill keyword extraction and auto-scoring",
+    "Admin dashboard with sortable/filterable candidate table",
+    "Job description matching with matched/missing skill breakdown",
+    "Bar chart analytics and CSV export",
+    "User registration and email/password login",
+    "Role-based routing (admin vs user)",
+    "Glass-morphism dark theme with cyan accent",
+    "Install to home screen guide"
+  ],
+  "category": "productivity",
+  "tags": [
+    "resume",
+    "ai",
+    "hr",
+    "recruitment",
+    "skill-matching",
+    "analytics",
+    "dashboard"
+  ],
+  "last_updated": "2026-04-11T04:43:45.891Z"
+}
