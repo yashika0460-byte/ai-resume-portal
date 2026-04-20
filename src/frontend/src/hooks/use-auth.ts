@@ -72,7 +72,12 @@ export interface AuthState {
   register: (
     email: string,
     password: string,
-  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  ) => Promise<
+    | { ok: true; token: string; role: UserRole; email: string }
+    | { ok: false; error: string }
+  >;
+  /** Immediately persist an auth session (used after register returns a token) */
+  persistSession: (token: string, email: string, role: UserRole) => void;
   error: string | null;
 }
 
@@ -341,11 +346,23 @@ export function useAuth(): AuthState {
     }
   }, [actor, user]);
 
+  const persistSession = useCallback(
+    (token: string, email: string, role: UserRole) => {
+      const authUser: AuthUser = { email, role, token };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+      setUser(authUser);
+    },
+    [],
+  );
+
   const register = useCallback(
     async (
       email: string,
       password: string,
-    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+    ): Promise<
+      | { ok: true; token: string; role: UserRole; email: string }
+      | { ok: false; error: string }
+    > => {
       // Wait up to 10 s for the actor to become ready (mirrors login behaviour)
       let readyActor = actorRef.current;
       if (!readyActor || isFetchingRef.current) {
@@ -358,11 +375,9 @@ export function useAuth(): AuthState {
             "Service is still loading. Please wait a moment and try again.",
         };
       }
+      const normalizedEmail = email.trim().toLowerCase();
       try {
-        const result = await readyActor.register(
-          email.trim().toLowerCase(),
-          password,
-        );
+        const result = await readyActor.register(normalizedEmail, password);
         if (result.__kind__ === "err") {
           if (result.err === "duplicateEmail") {
             return {
@@ -377,7 +392,14 @@ export function useAuth(): AuthState {
               "Registration failed. Please check your input and try again.",
           };
         }
-        return { ok: true };
+        // Backend returns LoginSuccess on success — extract token + role
+        const { token, role: rawRole } = result.ok;
+        const role: UserRole = rawRole === "admin" ? "admin" : "user";
+        // Persist immediately so the user is logged in right away
+        const authUser: AuthUser = { email: normalizedEmail, role, token };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+        setUser(authUser);
+        return { ok: true, token, role, email: normalizedEmail };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (
@@ -412,6 +434,7 @@ export function useAuth(): AuthState {
     login,
     logout,
     register,
+    persistSession,
     error,
   };
 }

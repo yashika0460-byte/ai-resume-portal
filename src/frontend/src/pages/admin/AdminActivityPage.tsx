@@ -1,6 +1,7 @@
 /**
  * AdminActivityPage — synthesized activity log from resume uploads + match history.
- * Read-only feed. No backend mutations.
+ * Color-coded action badges with icons, timeline format, filter by type,
+ * date range filter, export CSV, dark glass-morphism design.
  */
 
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMatchHistory, useResumes } from "@/hooks/use-resumes";
 import { cn } from "@/lib/utils";
 import type { MatchRecord, Resume } from "@/types";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   ArrowDownUp,
@@ -18,8 +20,12 @@ import {
   ChevronLeft,
   Download,
   FileUp,
+  Key,
   Layers,
+  LogIn,
   Search,
+  Trash2,
+  Upload,
   Users,
   Zap,
 } from "lucide-react";
@@ -32,9 +38,9 @@ type ActionType = "Resume Upload" | "Job Match";
 interface ActivityEvent {
   id: string;
   type: ActionType;
-  timestamp: string; // ISO
-  actor: string; // email or "system"
-  target: string; // filename or jobDescription (truncated)
+  timestamp: string;
+  actor: string;
+  target: string;
   score: number;
 }
 
@@ -52,16 +58,14 @@ function synthesizeEvents(
     target: r.filename,
     score: r.score,
   }));
-
   const matchEvents: ActivityEvent[] = matches.map((m) => ({
     id: `match-${m.id}`,
     type: "Job Match",
     timestamp: m.createdAt,
     actor: "system",
-    target: m.jobDescription.slice(0, 50),
+    target: m.jobDescription.slice(0, 60),
     score: m.matchScore,
   }));
-
   return [...uploadEvents, ...matchEvents].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
@@ -111,24 +115,44 @@ function exportCSV(events: ActivityEvent[]) {
 }
 
 const PAGE_SIZE = 25;
-
 type FilterType = "All" | "Resume Upload" | "Job Match";
 type SortDir = "desc" | "asc";
+
+// ─── Action Badge Config ──────────────────────────────────────────────────────
+
+const ACTION_CONFIG: Record<
+  ActionType,
+  {
+    icon: React.ElementType;
+    iconColor: string;
+    badgeClass: string;
+    bgClass: string;
+  }
+> = {
+  "Resume Upload": {
+    icon: FileUp,
+    iconColor: "text-indigo-400",
+    badgeClass: "bg-indigo-500/10 text-indigo-300 border-indigo-500/25",
+    bgClass: "bg-indigo-500/10 border-indigo-500/20",
+  },
+  "Job Match": {
+    icon: Zap,
+    iconColor: "text-violet-400",
+    badgeClass: "bg-violet-500/10 text-violet-300 border-violet-500/25",
+    bgClass: "bg-violet-500/10 border-violet-500/20",
+  },
+};
 
 // ─── Stats Bar ────────────────────────────────────────────────────────────────
 
 function StatsBar({
   events,
   resumes,
-}: {
-  events: ActivityEvent[];
-  resumes: Resume[];
-}) {
+}: { events: ActivityEvent[]; resumes: Resume[] }) {
   const totalUploads = events.filter((e) => e.type === "Resume Upload").length;
   const totalMatches = events.filter((e) => e.type === "Job Match").length;
   const todayCount = events.filter((e) => isToday(e.timestamp)).length;
 
-  // Most active user by upload count
   const uploadsByActor: Record<string, number> = {};
   for (const r of resumes) {
     const actor = (r as Resume & { uploadedBy?: string }).uploadedBy ?? "user";
@@ -142,29 +166,25 @@ function StatsBar({
       icon: FileUp,
       label: "Total Uploads",
       value: totalUploads,
-      color: "text-primary",
-      bg: "bg-primary/8",
+      colorClass: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     },
     {
       icon: Zap,
       label: "Total Matches",
       value: totalMatches,
-      color: "text-accent",
-      bg: "bg-accent/8",
+      colorClass: "bg-violet-500/10 text-violet-400 border-violet-500/20",
     },
     {
       icon: Users,
       label: "Most Active",
       value: mostActiveUser,
-      color: "text-chart-3",
-      bg: "bg-chart-3/8",
+      colorClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     },
     {
       icon: CalendarDays,
       label: "Today's Activity",
       value: todayCount,
-      color: "text-chart-4",
-      bg: "bg-chart-4/8",
+      colorClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     },
   ] as const;
 
@@ -176,18 +196,16 @@ function StatsBar({
       {stats.map((s) => (
         <div
           key={s.label}
-          className="glass rounded-xl p-4 flex items-center gap-3"
+          className="glass rounded-xl p-4 flex items-center gap-3 border border-border/15 hover:border-accent/20 transition-all duration-200"
         >
-          <div className={cn("p-2 rounded-lg", s.bg)}>
-            <s.icon className={cn("size-4", s.color)} />
+          <div className={`p-2 rounded-xl border shrink-0 ${s.colorClass}`}>
+            <s.icon className="size-4" />
           </div>
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground leading-none mb-1">
               {s.label}
             </p>
-            <p
-              className={cn("font-display font-bold text-sm truncate", s.color)}
-            >
+            <p className="font-display font-bold text-sm text-foreground truncate">
               {typeof s.value === "number" ? s.value.toLocaleString() : s.value}
             </p>
           </div>
@@ -207,7 +225,7 @@ function SkeletonRows() {
     >
       {["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8"].map((key) => (
         <div key={key} className="flex items-center gap-4 px-6 py-4">
-          <Skeleton className="size-8 rounded-full shrink-0" />
+          <Skeleton className="size-9 rounded-full shrink-0" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-3.5 w-48 rounded" />
             <Skeleton className="h-3 w-72 rounded" />
@@ -224,48 +242,42 @@ function SkeletonRows() {
 function ActivityRow({
   event,
   index,
-}: {
-  event: ActivityEvent;
-  index: number;
-}) {
-  const isUpload = event.type === "Resume Upload";
+}: { event: ActivityEvent; index: number }) {
+  const config = ACTION_CONFIG[event.type];
+  const Icon = config.icon;
 
   return (
     <div
-      className="flex items-start sm:items-center gap-3 px-6 py-4 hover:bg-muted/20 transition-smooth"
+      className="flex items-start sm:items-center gap-4 px-6 py-4 hover:bg-muted/10 transition-smooth border-b border-border/8 last:border-0"
       data-ocid={`admin-activity.item.${index + 1}`}
     >
-      {/* Icon */}
+      {/* Icon circle */}
       <div
         className={cn(
-          "size-9 rounded-full flex items-center justify-center shrink-0",
-          isUpload ? "bg-primary/10" : "bg-accent/10",
+          "size-9 rounded-full flex items-center justify-center shrink-0 border",
+          config.bgClass,
         )}
       >
-        {isUpload ? (
-          <FileUp className="size-4 text-primary" />
-        ) : (
-          <Zap className="size-4 text-accent" />
-        )}
+        <Icon className={cn("size-4", config.iconColor)} />
       </div>
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-0.5">
-          <Badge
-            variant="secondary"
-            className={cn(
-              "text-xs font-medium px-2 py-0.5",
-              isUpload
-                ? "bg-primary/10 text-primary border-primary/20"
-                : "bg-accent/10 text-accent border-accent/20",
-            )}
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}
           >
+            <Icon className="size-3" />
             {event.type}
-          </Badge>
+          </span>
           <span className="text-xs text-muted-foreground">
             {formatDate(event.timestamp)}
           </span>
+          {isToday(event.timestamp) && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+              Today
+            </span>
+          )}
         </div>
         <p className="text-sm text-foreground font-medium truncate">
           {event.target}
@@ -278,12 +290,12 @@ function ActivityRow({
       {/* Score pill */}
       <div
         className={cn(
-          "shrink-0 px-3 py-1 rounded-full text-xs font-bold font-mono",
+          "shrink-0 px-3 py-1 rounded-full text-xs font-bold font-mono border",
           event.score >= 70
-            ? "bg-accent/10 text-accent"
+            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
             : event.score >= 40
-              ? "bg-primary/10 text-primary"
-              : "bg-muted text-muted-foreground",
+              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+              : "bg-muted/20 text-muted-foreground border-border/20",
         )}
       >
         {event.score}%
@@ -297,16 +309,14 @@ function ActivityRow({
 export default function AdminActivityPage() {
   const resumesQuery = useResumes();
   const matchQuery = useMatchHistory();
-
+  const navigate = useNavigate();
   const isLoading = resumesQuery.isLoading || matchQuery.isLoading;
 
-  // Synthesize all events
   const allEvents = useMemo(
     () => synthesizeEvents(resumesQuery.data ?? [], matchQuery.data ?? []),
     [resumesQuery.data, matchQuery.data],
   );
 
-  // ── Filter / Sort state ──
   const [filterType, setFilterType] = useState<FilterType>("All");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
@@ -314,16 +324,9 @@ export default function AdminActivityPage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
 
-  // ── Derived filtered + sorted events ──
   const filteredEvents = useMemo(() => {
     let ev = allEvents;
-
-    // Type filter
-    if (filterType !== "All") {
-      ev = ev.filter((e) => e.type === filterType);
-    }
-
-    // Search
+    if (filterType !== "All") ev = ev.filter((e) => e.type === filterType);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       ev = ev.filter(
@@ -332,25 +335,20 @@ export default function AdminActivityPage() {
           e.target.toLowerCase().includes(q),
       );
     }
-
-    // Date range
     if (dateFrom) {
       const from = new Date(dateFrom).getTime();
       ev = ev.filter((e) => new Date(e.timestamp).getTime() >= from);
     }
     if (dateTo) {
-      const to = new Date(dateTo).getTime() + 86_400_000; // inclusive end
+      const to = new Date(dateTo).getTime() + 86_400_000;
       ev = ev.filter((e) => new Date(e.timestamp).getTime() <= to);
     }
-
-    // Sort
     if (sortDir === "asc") {
       ev = [...ev].sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
     }
-
     return ev;
   }, [allEvents, filterType, search, dateFrom, dateTo, sortDir]);
 
@@ -365,7 +363,6 @@ export default function AdminActivityPage() {
     setFilterType(f);
     setPage(1);
   }
-
   function handleSearch(v: string) {
     setSearch(v);
     setPage(1);
@@ -376,10 +373,10 @@ export default function AdminActivityPage() {
       className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-6 fade-up"
       data-ocid="admin-activity.page"
     >
-      {/* ── Back button ── */}
+      {/* Back button */}
       <button
         type="button"
-        onClick={() => window.history.back()}
+        onClick={() => void navigate({ to: "/admin/overview" })}
         aria-label="Go back"
         data-ocid="admin-activity.back_button"
         className="fixed top-4 left-4 z-50 flex items-center justify-center size-9 rounded-xl bg-muted/30 border border-border/40 text-muted-foreground hover:text-accent hover:border-accent/50 hover:bg-accent/10 backdrop-blur-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
@@ -387,7 +384,7 @@ export default function AdminActivityPage() {
         <ChevronLeft className="size-5" aria-hidden="true" />
       </button>
 
-      {/* ── Page header ── */}
+      {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="p-2.5 rounded-xl bg-accent/15 border border-accent/30 shrink-0 mt-0.5">
@@ -433,7 +430,6 @@ export default function AdminActivityPage() {
         className="glass rounded-2xl border border-border/20 p-4 space-y-3"
         data-ocid="admin-activity.filters"
       >
-        {/* Top row: search + date range */}
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
@@ -441,7 +437,7 @@ export default function AdminActivityPage() {
               placeholder="Search by actor or target…"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-9 h-9 text-sm"
+              className="pl-9 h-9 text-sm bg-background/40 border-border/30"
               data-ocid="admin-activity.search_input"
             />
           </div>
@@ -454,7 +450,7 @@ export default function AdminActivityPage() {
                 setDateFrom(e.target.value);
                 setPage(1);
               }}
-              className="h-9 w-36 text-sm"
+              className="h-9 w-36 text-sm bg-background/40 border-border/30"
               data-ocid="admin-activity.date_from_input"
             />
             <span className="text-xs">to</span>
@@ -465,38 +461,48 @@ export default function AdminActivityPage() {
                 setDateTo(e.target.value);
                 setPage(1);
               }}
-              className="h-9 w-36 text-sm"
+              className="h-9 w-36 text-sm bg-background/40 border-border/30"
               data-ocid="admin-activity.date_to_input"
             />
           </div>
         </div>
-
-        {/* Bottom row: type filters + sort toggle */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div
             className="flex gap-1 p-1 rounded-lg bg-muted/20 border border-border/20 w-fit"
             data-ocid="admin-activity.type_filter"
           >
             {(["All", "Resume Upload", "Job Match"] as FilterType[]).map(
-              (tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => handleFilterChange(tab)}
-                  data-ocid={`admin-activity.filter.${tab.toLowerCase().replace(" ", "_")}`}
-                  className={cn(
-                    "px-3 py-1 rounded-md text-xs font-medium transition-smooth whitespace-nowrap",
-                    filterType === tab
-                      ? "bg-accent/20 text-accent border border-accent/30"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
-                  )}
-                >
-                  {tab}
-                </button>
-              ),
+              (tab) => {
+                const isActive = filterType === tab;
+                const config =
+                  tab !== "All" ? ACTION_CONFIG[tab as ActionType] : null;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => handleFilterChange(tab)}
+                    data-ocid={`admin-activity.filter.${tab.toLowerCase().replace(" ", "_")}`}
+                    className={cn(
+                      "px-3 py-1 rounded-md text-xs font-medium transition-smooth whitespace-nowrap flex items-center gap-1.5",
+                      isActive
+                        ? "bg-accent/20 text-accent border border-accent/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                    )}
+                  >
+                    {config && (
+                      <config.icon
+                        className={cn(
+                          "size-3",
+                          isActive ? "text-accent" : config.iconColor,
+                        )}
+                      />
+                    )}
+                    {tab}
+                  </button>
+                );
+              },
             )}
           </div>
-
           <button
             type="button"
             onClick={() => {
@@ -521,8 +527,7 @@ export default function AdminActivityPage() {
         className="glass rounded-2xl border border-border/20 overflow-hidden"
         data-ocid="admin-activity.feed"
       >
-        {/* Table header */}
-        <div className="px-6 py-3.5 border-b border-border/15 flex items-center gap-2 bg-muted/20">
+        <div className="px-6 py-3.5 border-b border-border/15 bg-muted/20 flex items-center gap-2">
           <Layers className="size-4 text-accent" />
           <span className="font-display font-semibold text-sm text-foreground">
             Events
@@ -537,16 +542,14 @@ export default function AdminActivityPage() {
           )}
         </div>
 
-        {/* Loading */}
         {isLoading && <SkeletonRows />}
 
-        {/* Empty state */}
         {!isLoading && filteredEvents.length === 0 && (
           <div
             className="flex flex-col items-center justify-center py-16 gap-3"
             data-ocid="admin-activity.empty_state"
           >
-            <div className="p-4 rounded-2xl bg-muted/30 border border-border/20">
+            <div className="p-4 rounded-2xl bg-muted/20 border border-border/20">
               <Activity className="size-8 text-muted-foreground" />
             </div>
             <p className="font-display font-semibold text-foreground text-base">
@@ -560,9 +563,8 @@ export default function AdminActivityPage() {
           </div>
         )}
 
-        {/* Rows */}
         {!isLoading && pagedEvents.length > 0 && (
-          <div className="divide-y divide-border/10">
+          <div>
             {pagedEvents.map((event, i) => (
               <ActivityRow
                 key={event.id}
@@ -573,9 +575,8 @@ export default function AdminActivityPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {!isLoading && totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-border/10 flex items-center justify-between gap-4">
+          <div className="px-6 py-4 border-t border-border/10 bg-muted/10 flex items-center justify-between gap-4">
             <span className="text-xs text-muted-foreground">
               Page {safePage} of {totalPages} &bull;{" "}
               {filteredEvents.length.toLocaleString()} total events

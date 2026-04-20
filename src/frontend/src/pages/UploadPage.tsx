@@ -1,13 +1,12 @@
 /**
- * UploadPage — PDF resume upload with drag-and-drop, real-backend progress
- * states, skill extraction display, score result card, and welcome empty state.
- *
- * Fix: progress steps now track the ACTUAL backend call, not fake timeouts.
- *  1. "Uploading" fires immediately on button click (progress 30%)
- *  2. The mutation is awaited. While it runs, a 500ms delay advances to
- *     "Analysing…" (progress 65%) to give visual feedback during the call.
- *  3. On SUCCESS  → step = "done", progress = 100, result card renders.
- *  4. On ERROR    → status = "error", error card shows, result card never shows.
+ * UploadPage — PDF resume upload with:
+ *   • Animated drag-and-drop zone (glow border, indigo tint on hover)
+ *   • Real-backend progress stages (Uploading → Analysing → Done)
+ *   • Circular SVG score gauge with animated stroke-dashoffset
+ *   • Color-coded skill chips (Technical=indigo, Tools=violet, Soft=emerald)
+ *   • Upload history list with compact score rings + expand/delete
+ *   • How It Works 3-step guide
+ *   • Account security card
  */
 
 import { useActor } from "@caffeineai/core-infrastructure";
@@ -18,8 +17,8 @@ import {
   Brain,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   ChevronUp,
+  Clock,
   FileText,
   FileUp,
   History,
@@ -27,18 +26,23 @@ import {
   Lock,
   ShieldCheck,
   Sparkles,
+  Trash2,
   XCircle,
   Zap,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BackendActor } from "../api";
 import { apiSetSecurityQuestion } from "../api";
 import { createActor } from "../backend";
 import { Button } from "../components/ui/AppButton";
 import { GlassCard } from "../components/ui/GlassCard";
-import { SkillBadge } from "../components/ui/SkillBadge";
+import { ScoreGauge, SkillBadge } from "../components/ui/SkillBadge";
 import { useAuth } from "../hooks/use-auth";
-import { useUploadResume } from "../hooks/use-resumes";
+import {
+  useDeleteResume,
+  useUploadResume,
+  useUserResumes,
+} from "../hooks/use-resumes";
 import type { Resume, UploadState } from "../types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -54,30 +58,32 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }
 
-function getScoreTier(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: "Excellent", color: "text-accent" };
-  if (score >= 60) return { label: "Good", color: "text-primary" };
-  return { label: "Fair", color: "text-muted-foreground" };
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-// ─── Welcome / Getting Started card ──────────────────────────────────────────
+// ─── How It Works ─────────────────────────────────────────────────────────────
 
 const HOW_IT_WORKS = [
   {
     step: "1",
-    icon: <FileUp className="size-4 text-accent" />,
+    icon: <FileUp className="size-4 text-indigo-400" />,
     title: "Upload your PDF",
     desc: "Drag and drop or click to select a PDF resume (max 10 MB).",
   },
   {
     step: "2",
-    icon: <Brain className="size-4 text-accent" />,
+    icon: <Brain className="size-4 text-violet-400" />,
     title: "AI extracts skills",
     desc: "Our engine scans for 60+ tech skills across Python, cloud, DevOps, ML, and more.",
   },
   {
     step: "3",
-    icon: <Zap className="size-4 text-accent" />,
+    icon: <Zap className="size-4 text-emerald-400" />,
     title: "Score & match",
     desc: "Receive an AI match score out of 100 and compare against any job description.",
   },
@@ -85,11 +91,8 @@ const HOW_IT_WORKS = [
 
 function WelcomeGuide() {
   return (
-    <GlassCard
-      className="flex flex-col gap-5 border-accent/10"
-      data-ocid="welcome-guide"
-    >
-      <div className="flex items-center gap-2.5">
+    <GlassCard className="border-accent/10" data-ocid="welcome-guide">
+      <div className="flex items-center gap-2.5 mb-5">
         <div className="p-1.5 rounded-lg bg-accent/15 border border-accent/25">
           <Sparkles className="size-4 text-accent" />
         </div>
@@ -104,14 +107,14 @@ function WelcomeGuide() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
-        {HOW_IT_WORKS.map(({ step, icon, title, desc }) => (
+        {HOW_IT_WORKS.map(({ step, icon, title, desc }, idx) => (
           <div key={step} className="flex-1 flex gap-3">
             <div className="flex flex-col items-center gap-1 shrink-0">
-              <div className="w-7 h-7 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-xs font-mono font-bold text-accent">
+              <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-mono font-bold text-foreground">
                 {step}
               </div>
-              {step !== "3" && (
-                <div className="flex-1 w-px bg-accent/15 hidden sm:block" />
+              {idx < 2 && (
+                <div className="flex-1 w-px bg-border/20 hidden sm:block" />
               )}
             </div>
             <div className="pb-3">
@@ -127,23 +130,15 @@ function WelcomeGuide() {
         ))}
       </div>
 
-      <div className="pt-1 border-t border-border/15 flex flex-wrap gap-4 text-xs text-muted-foreground/60">
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          PDF only
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          Max 10 MB
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          Results in seconds
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          Stored securely
-        </span>
+      <div className="pt-3 border-t border-border/15 flex flex-wrap gap-4 text-xs text-muted-foreground/60">
+        {["PDF only", "Max 10 MB", "Results in seconds", "Stored securely"].map(
+          (note) => (
+            <span key={note} className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
+              {note}
+            </span>
+          ),
+        )}
       </div>
     </GlassCard>
   );
@@ -164,18 +159,12 @@ const STEPS: { key: UploadStep; label: string; icon: React.ReactNode }[] = [
     label: "Analysing resume",
     icon: <Brain className="size-3.5" />,
   },
-  {
-    key: "done",
-    label: "Scoring",
-    icon: <Sparkles className="size-3.5" />,
-  },
+  { key: "done", label: "Scoring", icon: <Sparkles className="size-3.5" /> },
 ];
-
 const STEP_ORDER: UploadStep[] = ["uploading", "analysing", "done"];
 
 function StepProgress({ currentStep }: { currentStep: UploadStep }) {
   if (currentStep === "idle") return null;
-
   return (
     <div className="flex items-center gap-2 pt-1">
       {STEPS.map((step, idx) => {
@@ -184,7 +173,6 @@ function StepProgress({ currentStep }: { currentStep: UploadStep }) {
         const isComplete = currentIdx > stepIdx;
         const isActive = currentStep === step.key;
         const isPending = currentIdx < stepIdx;
-
         return (
           <div key={step.key} className="flex items-center gap-2">
             <div
@@ -219,6 +207,270 @@ function StepProgress({ currentStep }: { currentStep: UploadStep }) {
   );
 }
 
+// ─── Animated score gauge that triggers fill on mount ─────────────────────────
+
+function AnimatedScoreGauge({ score }: { score: number }) {
+  const r = 54;
+  const circumference = 2 * Math.PI * r;
+  const [dashoffset, setDashoffset] = useState(circumference);
+
+  function getColor(s: number): string {
+    if (s >= 85) return "oklch(0.72 0.18 162)";
+    if (s >= 70) return "oklch(0.67 0.22 264)";
+    if (s >= 50) return "oklch(0.78 0.18 75)";
+    return "oklch(0.65 0.23 27)";
+  }
+
+  function getTier(s: number): string {
+    if (s >= 85) return "Excellent";
+    if (s >= 70) return "Good";
+    if (s >= 50) return "Fair";
+    return "Low";
+  }
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setDashoffset(circumference - (score / 100) * circumference);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [score, circumference]);
+
+  const color = getColor(score);
+  const tier = getTier(score);
+
+  return (
+    <div
+      className="relative inline-flex items-center justify-center"
+      style={{ width: 128, height: 128 }}
+    >
+      <svg
+        width={128}
+        height={128}
+        viewBox="0 0 128 128"
+        aria-label={`Score ${score} out of 100, ${tier}`}
+        role="img"
+      >
+        <title>{`Score: ${score}/100 — ${tier}`}</title>
+        <circle
+          cx={64}
+          cy={64}
+          r={r}
+          fill="none"
+          stroke="oklch(1 0 0 / 0.08)"
+          strokeWidth={9}
+        />
+        <circle
+          cx={64}
+          cy={64}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={9}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashoffset}
+          transform="rotate(-90 64 64)"
+          style={{ transition: "stroke-dashoffset 1.5s ease-out" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span
+          className="font-mono font-bold leading-none"
+          style={{ fontSize: 28, color }}
+        >
+          {score}
+        </span>
+        <span className="text-xs text-muted-foreground mt-0.5 font-medium">
+          {tier}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── History item card ────────────────────────────────────────────────────────
+
+function HistoryCard({
+  resume,
+  onDelete,
+}: { resume: Resume; onDelete: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div
+      className="glass rounded-xl border border-border/20 overflow-hidden transition-smooth hover:border-accent/20"
+      data-ocid={`history.item.${resume.id}`}
+    >
+      {/* Summary row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <ScoreGauge score={resume.score} size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">
+            {resume.filename}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Clock className="size-3 text-muted-foreground/50" />
+            <span className="text-xs text-muted-foreground">
+              {formatDate(resume.uploadDate)}
+            </span>
+            <span className="text-xs text-muted-foreground/50">·</span>
+            <span className="text-xs text-muted-foreground">
+              {resume.skills.length} skill
+              {resume.skills.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-smooth"
+            aria-label={expanded ? "Collapse skill list" : "Expand skill list"}
+            data-ocid={`history.expand-toggle.${resume.id}`}
+          >
+            {expanded ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <ChevronDown className="size-4" />
+            )}
+          </button>
+          {!confirming ? (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-smooth"
+              aria-label="Delete resume"
+              data-ocid={`history.delete_button.${resume.id}`}
+            >
+              <Trash2 className="size-4" />
+            </button>
+          ) : (
+            <div
+              className="flex items-center gap-1"
+              data-ocid={`history.confirm-delete.${resume.id}`}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(resume.id);
+                  setConfirming(false);
+                }}
+                className="px-2 py-1 rounded text-xs font-medium bg-destructive/20 text-destructive hover:bg-destructive/30 border border-destructive/30 transition-smooth"
+                data-ocid={`history.confirm_button.${resume.id}`}
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                className="px-2 py-1 rounded text-xs font-medium bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-border/20 transition-smooth"
+                data-ocid={`history.cancel_button.${resume.id}`}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded skill chips */}
+      {expanded && (
+        <div className="border-t border-border/15 px-4 py-3 bg-muted/5">
+          {resume.skills.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {resume.skills.map((skill) => (
+                <SkillBadge key={skill} label={skill} status="matched" />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground/60 italic">
+              No skills extracted.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Upload history section ───────────────────────────────────────────────────
+
+function UploadHistory() {
+  const { data: resumes = [], isLoading } = useUserResumes();
+  const { mutateAsync: deleteResume } = useDeleteResume();
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteResume(id);
+    } catch {
+      // silent — parent invalidates queries
+    }
+  };
+
+  return (
+    <GlassCard className="border-border/20" data-ocid="upload-history-section">
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="p-1.5 rounded-lg bg-primary/15 border border-primary/25">
+          <History className="size-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-display font-semibold text-foreground text-sm">
+            Upload History
+          </p>
+          <p className="text-xs text-muted-foreground">
+            All your previously analyzed resumes
+          </p>
+        </div>
+        {resumes.length > 0 && (
+          <span className="px-2 py-0.5 rounded-full bg-primary/15 border border-primary/25 text-xs font-mono font-medium text-primary">
+            {resumes.length}
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-2" data-ocid="history.loading_state">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-16 rounded-xl bg-muted/20 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : resumes.length === 0 ? (
+        <div
+          className="flex flex-col items-center justify-center gap-3 py-10 text-center"
+          data-ocid="history.empty_state"
+        >
+          <div className="p-4 rounded-2xl bg-muted/20 border border-border/20">
+            <FileText className="size-8 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              No uploads yet
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Drop your first PDF above to get started
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2" data-ocid="history.list">
+          {resumes.map((resume) => (
+            <HistoryCard
+              key={resume.id}
+              resume={resume}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 // ─── Security question options ────────────────────────────────────────────────
 
 const SECURITY_QUESTIONS = [
@@ -250,10 +502,8 @@ function AccountSecurityCard({ token }: { token: string }) {
     const finalQuestion = useCustom ? customQuestion.trim() : question;
     const finalAnswer = answer.trim();
     if (!finalQuestion || !finalAnswer) return;
-
     setStatus("saving");
     setErrorMsg(null);
-
     try {
       const result = await apiSetSecurityQuestion(
         actor as BackendActor,
@@ -276,7 +526,6 @@ function AccountSecurityCard({ token }: { token: string }) {
 
   return (
     <GlassCard className="border-border/20" data-ocid="account-security-card">
-      {/* Header — toggle */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -306,10 +555,8 @@ function AccountSecurityCard({ token }: { token: string }) {
         </div>
       </button>
 
-      {/* Expanded content */}
       {open && (
         <div className="mt-4 pt-4 border-t border-border/15 flex flex-col gap-4">
-          {/* Status: success banner */}
           {status === "success" && (
             <div
               className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-accent/30 bg-accent/8"
@@ -322,19 +569,14 @@ function AccountSecurityCard({ token }: { token: string }) {
               </p>
             </div>
           )}
-
-          {/* Explanation */}
           <div className="flex items-start gap-2 text-xs text-muted-foreground/80 leading-relaxed">
             <Lock className="size-3.5 shrink-0 mt-0.5 text-muted-foreground/50" />
             <span>
               Your answer is stored securely and used only to verify your
-              identity when resetting your password. Choose a question only you
-              know the answer to.
+              identity when resetting your password.
             </span>
           </div>
-
           <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-            {/* Question selector */}
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor={
@@ -381,8 +623,6 @@ function AccountSecurityCard({ token }: { token: string }) {
                 {useCustom ? "← Choose from list" : "Write a custom question"}
               </button>
             </div>
-
-            {/* Answer */}
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor="security-answer"
@@ -403,8 +643,6 @@ function AccountSecurityCard({ token }: { token: string }) {
                 data-ocid="input-security-answer"
               />
             </div>
-
-            {/* Error */}
             {status === "error" && errorMsg && (
               <div
                 className="flex items-center gap-2 text-xs text-destructive"
@@ -414,7 +652,6 @@ function AccountSecurityCard({ token }: { token: string }) {
                 <span>{errorMsg}</span>
               </div>
             )}
-
             <Button
               type="submit"
               disabled={
@@ -465,7 +702,7 @@ export default function UploadPage() {
       setUploadState({
         status: "error",
         progress: 0,
-        error: "Only PDF files are supported. Please select a .pdf file.",
+        error: "Only PDF files are supported.",
       });
       setStep("idle");
       return;
@@ -474,7 +711,7 @@ export default function UploadPage() {
       setUploadState({
         status: "error",
         progress: 0,
-        error: `File size exceeds the ${MAX_SIZE_MB}MB limit. Please compress or split the file.`,
+        error: `File exceeds ${MAX_SIZE_MB}MB limit.`,
       });
       setStep("idle");
       return;
@@ -503,60 +740,32 @@ export default function UploadPage() {
     [processFile],
   );
 
-  /**
-   * Fixed upload flow — all progress gates are tied to the real mutation:
-   *
-   *  1. Immediately: step = "uploading", progress = 30%
-   *  2. Start mutation + brief 500ms delay to show "uploading" visually
-   *  3. After delay: step = "analysing", progress = 65%  (mutation still running)
-   *  4. Await mutation result:
-   *     ✅ SUCCESS → step = "done", progress = 100%, result card shown
-   *     ❌ ERROR   → status = "error", error card shown, result card hidden
-   */
   const handleUpload = async () => {
     if (!selectedFile) return;
-
-    // ── Step 1: show "uploading" immediately ────────────────────────────────
     setStep("uploading");
     setUploadState({ status: "uploading", progress: 30 });
-
     try {
-      // ── Step 2: kick off the real mutation ─────────────────────────────────
       const mutationPromise = uploadResume({
         filename: selectedFile.name,
         file: selectedFile,
       });
-
-      // ── Step 3: brief visual delay so user sees "uploading" step ──────────
       await new Promise<void>((r) => setTimeout(r, 500));
       setStep("analysing");
       setUploadState({ status: "uploading", progress: 65 });
-
-      // ── Step 4: await the actual backend result ────────────────────────────
       const resume = await mutationPromise;
-
-      // ── Step 5: SUCCESS ────────────────────────────────────────────────────
       setStep("done");
       setResult(resume);
       setUploadState({ status: "success", progress: 100 });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
-      // ── Step 5 (alt): ERROR — set status="error" so error card renders ─────
       const raw = err instanceof Error ? err.message : String(err);
       const userMsg = raw.startsWith("Actor not ready")
         ? "The backend is still loading. Please wait a moment and try again."
         : raw || "Analysis failed. Please try again.";
-
-      console.error("[UploadPage] Upload failed:", err);
-
       setStep("idle");
-      setResult(null); // ensure result card never shows on error
-      setUploadState({
-        status: "error",
-        progress: 0,
-        error: userMsg,
-      });
+      setResult(null);
+      setUploadState({ status: "error", progress: 0, error: userMsg });
     }
   };
 
@@ -570,21 +779,9 @@ export default function UploadPage() {
 
   const isUploading = uploadState.status === "uploading";
   const isIdle = uploadState.status === "idle" && !selectedFile && !result;
-  const scoreTier = result ? getScoreTier(result.score) : null;
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6 fade-up">
-      {/* ── Back button ── */}
-      <button
-        type="button"
-        onClick={() => window.history.back()}
-        aria-label="Go back"
-        data-ocid="btn-back"
-        className="fixed top-4 left-4 z-50 flex items-center justify-center size-9 rounded-xl bg-muted/30 border border-border/40 text-muted-foreground hover:text-accent hover:border-accent/50 hover:bg-accent/10 backdrop-blur-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-      >
-        <ChevronLeft className="size-5" aria-hidden="true" />
-      </button>
-
       {/* ── Page header ── */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
@@ -596,8 +793,8 @@ export default function UploadPage() {
               Upload Resume
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Drop a PDF resume and our AI will extract skills and compute a
-              match score automatically.
+              Drop a PDF and our AI will extract skills and score your resume
+              automatically.
             </p>
           </div>
         </div>
@@ -618,7 +815,6 @@ export default function UploadPage() {
       {/* ── Drop zone (hidden after success) ── */}
       {uploadState.status !== "success" && (
         <GlassCard className="p-0 overflow-hidden">
-          {/* Drop target area */}
           <label
             htmlFor="file-drop-input"
             aria-label="File upload drop zone — drag and drop or click to browse"
@@ -629,25 +825,32 @@ export default function UploadPage() {
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             data-ocid="dropzone-upload"
-            className={`flex flex-col items-center justify-center gap-5 py-12 px-8 cursor-pointer transition-smooth rounded-xl m-1 ${
+            className={[
+              "flex flex-col items-center justify-center gap-5 py-14 px-8 cursor-pointer rounded-xl m-1 transition-all duration-300",
+              "border-2 border-dashed",
               dragOver
-                ? "bg-accent/10 border-2 border-dashed border-accent/50"
-                : "border-2 border-dashed border-border/25 hover:border-accent/35 hover:bg-muted/10"
-            }`}
+                ? "bg-indigo-500/10 border-indigo-400/60 shadow-[0_0_32px_oklch(0.67_0.22_264_/_0.18)]"
+                : "border-border/25 hover:border-indigo-400/35 hover:bg-indigo-500/5",
+            ].join(" ")}
           >
-            {/* Animated icon */}
+            {/* File icon with glow */}
             <div
-              className={`relative p-5 rounded-2xl transition-smooth ${
-                dragOver ? "bg-accent/20 accent-glow" : "bg-muted/25"
-              }`}
+              className={[
+                "relative p-5 rounded-2xl transition-all duration-300",
+                dragOver
+                  ? "bg-indigo-500/20 shadow-[0_0_24px_oklch(0.67_0.22_264_/_0.3)]"
+                  : "bg-muted/25",
+              ].join(" ")}
             >
               <FileText
-                className={`size-10 transition-smooth ${
-                  dragOver ? "text-accent scale-110" : "text-muted-foreground"
+                className={`size-10 transition-all duration-300 ${
+                  dragOver
+                    ? "text-indigo-400 scale-110"
+                    : "text-muted-foreground"
                 }`}
               />
               {dragOver && (
-                <div className="absolute inset-0 rounded-2xl border-2 border-accent/50 animate-pulse" />
+                <div className="absolute inset-0 rounded-2xl border-2 border-indigo-400/50 animate-pulse" />
               )}
             </div>
 
@@ -681,7 +884,6 @@ export default function UploadPage() {
           {/* Selected file + action bar */}
           {selectedFile && (
             <div className="border-t border-border/20 bg-muted/10 px-5 py-4 flex flex-col gap-3">
-              {/* File info */}
               <div className="flex items-center gap-3 min-w-0">
                 <div className="p-2 rounded-lg bg-primary/15 border border-primary/25 shrink-0">
                   <FileText className="size-4 text-primary" />
@@ -706,7 +908,6 @@ export default function UploadPage() {
                 </Button>
               </div>
 
-              {/* Upload button + step progress */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <Button
                   onClick={handleUpload}
@@ -727,15 +928,14 @@ export default function UploadPage() {
                     </>
                   )}
                 </Button>
-
                 {isUploading && <StepProgress currentStep={step} />}
               </div>
 
-              {/* Progress bar — only shown while uploading, tied to real progress */}
+              {/* Animated progress bar */}
               {isUploading && (
-                <div className="score-bar mt-1">
+                <div className="mt-1 h-1.5 rounded-full bg-muted/30 overflow-hidden">
                   <div
-                    className="score-bar-fill transition-all duration-700"
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-accent transition-all duration-700"
                     style={{ width: `${uploadState.progress}%` }}
                   />
                 </div>
@@ -745,7 +945,7 @@ export default function UploadPage() {
         </GlassCard>
       )}
 
-      {/* ── Error card — shown ONLY when status is "error" ── */}
+      {/* ── Error card ── */}
       {uploadState.status === "error" && (
         <div
           data-ocid="upload-error"
@@ -776,7 +976,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* ── File type hint (idle, no file, no error) ── */}
+      {/* ── File type hint ── */}
       {uploadState.status === "idle" && !selectedFile && (
         <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-muted/20 border border-border/20">
           <AlertCircle className="size-4 text-muted-foreground/60 shrink-0 mt-0.5" />
@@ -788,17 +988,13 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* ── Success result card — ONLY shown when status==="success" AND result is not null ── */}
+      {/* ── Success result card with circular score gauge ── */}
       {uploadState.status === "success" && result !== null && (
         <div className="flex flex-col gap-4 fade-up">
           {/* Success banner */}
           <div
             data-ocid="upload-success"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl border"
-            style={{
-              backgroundColor: "oklch(0.72 0.18 198 / 0.1)",
-              borderColor: "oklch(0.72 0.18 198 / 0.3)",
-            }}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl border border-accent/30 bg-accent/8"
           >
             <CheckCircle2 className="size-5 text-accent shrink-0" />
             <div className="flex-1 min-w-0">
@@ -816,7 +1012,7 @@ export default function UploadPage() {
           {/* Result card */}
           <GlassCard className="border-accent/20" data-ocid="result-card">
             {/* Header row */}
-            <div className="flex items-start gap-4 mb-5">
+            <div className="flex items-start gap-4 mb-6">
               <div className="p-2.5 rounded-xl bg-muted/30 border border-border/20 shrink-0">
                 <FileText className="size-5 text-primary" />
               </div>
@@ -830,38 +1026,38 @@ export default function UploadPage() {
               </div>
             </div>
 
-            {/* Score section */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  AI Match Score
-                </span>
-                <div className="flex items-center gap-2">
-                  {scoreTier && (
-                    <span className={`text-xs font-medium ${scoreTier.color}`}>
-                      {scoreTier.label}
-                    </span>
-                  )}
-                  <span className="font-mono font-bold text-accent text-xl">
-                    {result.score}
-                  </span>
-                  <span className="text-muted-foreground text-xs">/100</span>
-                </div>
-              </div>
-              <div className="score-bar">
-                <div
-                  className="score-bar-fill"
-                  style={{ width: `${result.score}%` }}
-                />
-              </div>
+            {/* Score section — centered circular gauge */}
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                AI Match Score
+              </p>
+              <AnimatedScoreGauge score={result.score} />
+              <p className="text-xs text-muted-foreground/60">out of 100</p>
             </div>
 
-            {/* Skills section */}
+            {/* Skills section — color-coded chips */}
             {result.skills.length > 0 && (
-              <div className="mb-5">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2.5">
-                  Extracted Skills ({result.skills.length})
-                </p>
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Extracted Skills ({result.skills.length})
+                  </p>
+                  {/* Legend */}
+                  <div className="flex items-center gap-2.5 text-xs text-muted-foreground/60">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm bg-indigo-500/50" />
+                      Tech
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm bg-violet-500/50" />
+                      Tools
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-sm bg-emerald-500/50" />
+                      Soft
+                    </span>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-1.5" data-ocid="skills-list">
                   {result.skills.map((skill) => (
                     <SkillBadge key={skill} label={skill} status="matched" />
@@ -925,7 +1121,10 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* ── Account Security card — always shown at bottom ── */}
+      {/* ── Upload history ── */}
+      <UploadHistory />
+
+      {/* ── Account Security card ── */}
       {user?.token && <AccountSecurityCard token={user.token} />}
     </div>
   );

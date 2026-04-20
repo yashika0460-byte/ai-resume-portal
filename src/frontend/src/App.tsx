@@ -16,6 +16,7 @@ import { Suspense, lazy } from "react";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const UploadPage = lazy(() => import("./pages/UploadPage"));
 const MatchPage = lazy(() => import("./pages/Match"));
@@ -94,12 +95,15 @@ function AdminPortalGuard() {
 
 /**
  * RoleBasedIndex — Resolves the default landing page.
+ * - Unauthenticated: show public landing page
+ * - Admin: /admin/overview
+ * - User: /upload
  */
 function RoleBasedIndex() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) return <PageLoader />;
-  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAuthenticated) return <LandingPage />;
 
   return (
     <Navigate to={user?.role === "admin" ? "/admin/overview" : "/upload"} />

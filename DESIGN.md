@@ -1,56 +1,73 @@
-# Design Brief — AI Resume Screening Portal
+# Design Brief — AI Resume Screening Portal (Next-Gen Dark Theme)
 
-## Tone & Purpose
-Premium tech workspace for intelligent resume analysis. Light, confident, professional. Glass-morphism conveys transparency and accessibility. Sky-blue to lavender gradient + teal accents evoke AI intelligence and trust. Admin portal extends this with structured sidebar navigation and email-locked security paradigm.
+## Direction
+Next-gen SaaS AI Portal — dark navy-to-indigo gradient with vibrant indigo/violet accents, glass-morphism cards, and smooth micro-interactions.
 
-## Color Palette (Light Mode + Admin Portal)
-| Token | OKLCH | Usage |
-|-------|-------|-------|
-| Background | `0.96 0.008 240` | Off-white, page surface |
-| Card | `0.98 0.005 240` | Frosted glass cards, overlay |
-| Primary | `0.44 0.2 246` | Electric blue, CTAs, active |
-| Secondary | `0.9 0.012 240` | Soft blue-grey, secondary UI |
-| Accent | `0.52 0.18 198` | Teal, highlights, admin nav active |
-| Foreground | `0.15 0.015 240` | Dark navy text |
-| Muted | `0.92 0.008 240` | Near-white muted text |
-| Border | `0.82 0.012 240` | Subtle dividers, card borders |
-| Destructive | `0.55 0.22 25` | Warm red, errors, warnings |
-| Sidebar | `0.88 0.015 246` | Admin nav background, light blue-white |
-| Sidebar Primary | `0.52 0.18 198` | Active nav item, teal accent |
+## Tone
+Premium, intelligent, cutting-edge. Dark mode conveys sophistication and focus. Production-grade aesthetic matching Linear, Vercel, and advanced tech SaaS.
+
+## Differentiation
+Animated CSS grid overlay on gradient background + glass cards with glow borders + circular score gauges + color-coded skill chips. Every interactive element has intentional micro-interaction choreography.
+
+## Color Palette
+
+| Token | OKLCH | Role |
+|-------|-------|------|
+| background | `0.08 0.015 264` | Deep navy page surface |
+| card | `0.13 0.012 264` | Elevated dark surface for glass cards |
+| foreground | `0.95 0.01 264` | Near-white text on dark |
+| primary | `0.53 0.22 264` | Vibrant indigo, CTAs, active states |
+| secondary | `0.56 0.2 300` | Violet for secondary actions |
+| accent | `0.62 0.22 300` | Bright violet, highlights, UI focus |
+| success | `0.54 0.2 151` | Emerald for positive indicators |
+| warning | `0.65 0.18 79` | Amber for caution/pending states |
+| destructive | `0.62 0.22 22` | Red for errors/delete actions |
+| muted | `0.25 0.01 264` | Dark grey for disabled/secondary text |
+| border | `0.18 0.012 264` | Dark subtle dividers |
 
 ## Typography
-| Layer | Font | Size | Weight | Usage |
-|-------|------|------|--------|-------|
-| Display | Space Grotesk | 32–48px | 600–700 | Headlines, section titles |
-| Body | Figtree | 14–16px | 400–500 | Copy, labels, form input |
-| Mono | JetBrains Mono | 12–14px | 400 | Code, technical data, scores |
+
+- **Display:** Space Grotesk 600–700 — headlines, section titles (32–48px)
+- **Body:** General Sans 400–500 — copy, labels, form input (14–16px)
+- **Mono:** JetBrains Mono 400 — code, technical data, scores (12–14px)
 
 ## Elevation & Depth
-Glass-morphism with three tiers: `glass` (cards), `glass-hover` (interaction state), `accent-glow` (highlights). Cards use `backdrop-blur-xl` with semi-transparent white. Shadows favor soft depth (`shadow-sm` to `shadow-md`) over contrast. Teal accents (`--accent`) provide visual focal points. Admin sidebar uses soft blue background (`--sidebar`) with teal active states.
+
+Glass-morphism cards with 24px blur, 1.5px indigo borders, and dual-layer shadows (ambient + inset glow). Hover states elevate background opacity and shift border to violet. No drop shadows on text. Layered surfaces: background < card < popover. Glow accents (`--glow-indigo`, `--glow-violet`) provide non-intrusive focus cues.
 
 ## Structural Zones
+
 | Zone | Background | Border | Treatment |
 |------|-----------|--------|-----------|
-| Header (Admin) | `glass` | subtle teal accent bottom | Logo, admin email, logout button, back arrow |
-| Sidebar (Admin) | `--sidebar` (light blue) | `--sidebar-border` | 250px desktop / collapsible mobile, nav items with active teal accent, email-locked security visual |
-| Content | `gradient-flow` (sky-blue to lavender) | none | Large glass card grid, 1–3 cols responsive |
-| Cards | `glass` with hover state | `border-border/20` | 12px radius, backdrop blur, semi-transparent |
-| Nav Items (Sidebar) | `--admin-nav-hover` on hover | none | Teal accent `--admin-nav-active` when active, rounded corners, 3px spacing |
-| Interactive | Primary + teal accents | teal outline on focus | Buttons, inputs transition-smooth on hover |
+| Page | gradient-flow (navy→indigo layered) | none | Animated grid overlay drift (20s) |
+| Header | glass | 1.5px primary/50% | Logo + admin email + logout + back arrow |
+| Sidebar (Admin) | `--sidebar` (0.11 0.012 264) | `--sidebar-border` | 250px fixed / mobile-collapsible, nav items with violet active state |
+| Card | glass with hover | 1.5px primary/20% | 12px radius, backdrop blur 24px, dual shadows |
+| Content Grid | gradient-flow | none | 1 col sm, 2 col md, 3 col lg responsive |
+| Interactive | indigo/violet | indigo on focus | Smooth 0.3s transitions, no hard snap |
+
+## Spacing & Rhythm
+
+16px base unit. Card padding 24px. Section gaps 32px. Content grid gap 20px. Micro-spacing (4px) for icon+text pairs. Consistent left/right padding (20px mobile, 32px desktop). Alternating section backgrounds (card vs subtle) creates visual rhythm.
 
 ## Component Patterns
-Admin portal: sidebar + main content area. Sidebar (250px / collapsible mobile) with five nav items (Overview, Candidates, Job Matching, User Management, Activity). Active nav item uses teal accent background + bold text. Main content: glass cards grid (1 col mobile, 2 cols tablet, 3 cols desktop). Card-based layout with `.glass` utility. Teal accents on CTAs, active states, data highlights. Header: app logo (left), admin email display (center-right), logout button (right), back arrow (top-left). No decorative gradients on text — text always solid `--foreground`.
+
+**Buttons:** indigo primary, violet hover, glass card background, 12px radius. **Cards:** glass morphism with glow on hover. **Badges:** color-coded by category (blue=technical, violet=soft, emerald=success). **Inputs:** dark input background (0.15 OKLCH) with indigo focus ring. **Score gauge:** circular radial visualization (SVG/canvas) preferred over linear progress. **Skill chips:** solid category colors, 4px border-radius, transition on focus.
 
 ## Motion & Micro-interactions
-`transition-smooth` (0.3s cubic-bezier) on all interactive elements. Sidebar nav items smooth transition on hover + active state (background + text color). Teal glow animation (`accent-glow`, subtle) on key CTAs. No bounce or flip animations — all motion is professional, refined. Sidebar collapse animation is smooth (no snapping). Active nav item transitions via background-color + text-weight.
+
+**Entrance:** fade-up 0.4s cubic-bezier on page load. **Hover:** smooth background/border transitions (0.3s) on cards & buttons. **Active:** nav items shift to violet accent + bold weight. **Decorative:** glow animation (2s ease-in-out) on key CTAs; grid drift (20s linear) on background; float-up animation (0.4s) on score updates. No bouncy/flip animations — all motion is purposeful and refined.
 
 ## Responsive Breakpoints
-- **sm** (640px): Single-column card layout, full-width inputs
-- **md** (768px): Two-column grid, tighter spacing
-- **lg** (1024px): Three-column grid, sidebar possible
+
+- **sm** (640px): Single-column cards, full-width inputs, collapsed sidebar (mobile menu icon)
+- **md** (768px): Two-column card grid, tighter spacing, compact sidebar on tablet
+- **lg** (1024px): Three-column card grid, full sidebar, expanded layout
 
 ## Anti-Patterns Avoided
-No rainbow colors. No blinking/flashing. No generic "AI purple" everywhere. No text gradients. No oversized glowing shadows. Cards are translucent but readable; content is never sacrificed for aesthetic effect.
+
+No rainbow palettes. No text gradients. No garish glow effects. No bouncy animations. No default Tailwind shadows. Cards are readable; content never sacrificed for aesthetics. Glows are subtle and purposeful. Only 5 semantic colors + neutrals. All animations have choreography, not scattered random motion.
 
 ## Signature Detail
-Teal accent on active sidebar nav items. Glass-morphism cards with subtle borders. Email-locked security paradigm (admin email `chandu46@gmail.com` displayed in header). Gradient background (sky-blue to lavender to pale mint) evokes data flow and professional intelligence. Sidebar navigation creates clear information hierarchy and role separation. Frosted glass cards maintain visual lightness while conveying premium quality.
+
+**Animated grid drift overlay** on gradient background paired with **glass cards with glow borders** and **circular score gauges**. Every interaction has smooth, intentional motion. Dark mode throughout conveys premium, focused, next-gen aesthetic.

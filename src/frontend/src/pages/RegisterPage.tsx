@@ -1,9 +1,9 @@
 /**
  * RegisterPage.tsx — Self-registration for AI Resume Screening Portal.
  *
- * Single-page form: email + password + confirm-password + math CAPTCHA.
- * The math CAPTCHA sits directly below the password fields on the same page.
- * No external CAPTCHA services required.
+ * Fields: email, password, confirm password, security question + answer, math CAPTCHA.
+ * CAPTCHA sits directly below confirm-password on the same page.
+ * After register() succeeds, calls login() to persist the token before redirecting.
  */
 
 import { useNavigate } from "@tanstack/react-router";
@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
+  HelpCircle,
   Lock,
   Mail,
   RefreshCw,
@@ -25,6 +26,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/AppButton";
 import { LoadingSpinner } from "../components/ui/LoadingSpinner";
 import { useAuth } from "../hooks/use-auth";
+
+// ─── Security question options ─────────────────────────────────────────────────
+
+const SECURITY_QUESTIONS = [
+  "What is the name of your first pet?",
+  "What city were you born in?",
+  "What is your mother's maiden name?",
+  "What was the name of your first school?",
+  "What is your favourite movie?",
+  "What was the make of your first car?",
+  "What is your oldest sibling's middle name?",
+  "What street did you grow up on?",
+];
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
@@ -72,6 +86,15 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Security question
+  const [securityQuestion, setSecurityQuestion] = useState(
+    SECURITY_QUESTIONS[0],
+  );
+  const [securityAnswer, setSecurityAnswer] = useState("");
+  const [securityAnswerError, setSecurityAnswerError] = useState<string | null>(
+    null,
+  );
+
   // Inline validation errors — shown on blur
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -118,6 +141,7 @@ export default function RegisterPage() {
       email.length > 0 &&
       password.length > 0 &&
       confirmPassword.length > 0 &&
+      securityAnswer.trim().length > 0 &&
       captchaAnswer.length > 0 &&
       !Number.isNaN(Number.parseInt(captchaAnswer, 10)),
     [
@@ -127,22 +151,26 @@ export default function RegisterPage() {
       email,
       password,
       confirmPassword,
+      securityAnswer,
       captchaAnswer,
     ],
   );
 
-  // ── Submit: validate all fields + CAPTCHA, then register ──
+  // ── Submit ──
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Re-validate everything
+    // Re-validate
     const eErr = validateEmail(email);
     const pErr = validatePassword(password);
     const cErr = validateConfirmPassword(password, confirmPassword);
+    const sErr = !securityAnswer.trim() ? "Security answer is required." : null;
     setEmailError(eErr);
     setPasswordError(pErr);
     setConfirmError(cErr);
-    if (eErr || pErr || cErr) return;
+    setSecurityAnswerError(sErr);
+    if (eErr || pErr || cErr || sErr) return;
 
     // Validate CAPTCHA
     const expected = challenge.a + challenge.b;
@@ -164,7 +192,9 @@ export default function RegisterPage() {
       return;
     }
 
-    window.location.href = "/login?registered=1";
+    // register() already persisted the session token — route based on role
+    const destination = result.role === "admin" ? "/admin/overview" : "/upload";
+    window.location.href = destination;
   };
 
   return (
@@ -188,10 +218,6 @@ export default function RegisterPage() {
         <div className="absolute -top-60 -left-60 w-[500px] h-[500px] rounded-full bg-primary/8 blur-[100px]" />
         <div className="absolute -bottom-60 -right-60 w-[500px] h-[500px] rounded-full bg-accent/8 blur-[100px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-secondary/5 blur-[80px]" />
-        <div className="absolute top-16 right-[20%] w-1.5 h-1.5 rounded-full bg-accent/40" />
-        <div className="absolute top-[30%] right-[10%] w-1 h-1 rounded-full bg-primary/40" />
-        <div className="absolute bottom-[25%] left-[15%] w-1.5 h-1.5 rounded-full bg-accent/30" />
-        <div className="absolute bottom-16 left-[35%] w-1 h-1 rounded-full bg-primary/30" />
       </div>
 
       {/* ── Main content ── */}
@@ -274,24 +300,24 @@ export default function RegisterPage() {
 
           {/* Right — Register card */}
           <motion.div
-            className="w-full max-w-sm lg:w-[380px] shrink-0"
+            className="w-full max-w-sm lg:w-[400px] shrink-0"
             initial={{ opacity: 0, x: 24 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="glass rounded-2xl p-8 flex flex-col gap-6 relative overflow-hidden">
+            <div className="glass rounded-2xl p-7 flex flex-col gap-5 relative overflow-hidden">
               {/* Inner glow */}
               <div
                 className="absolute inset-0 rounded-2xl pointer-events-none"
                 style={{
                   background:
-                    "radial-gradient(ellipse at top, oklch(0.72 0.18 198 / 0.06) 0%, transparent 70%)",
+                    "radial-gradient(ellipse at 30% 0%, oklch(0.62 0.22 300 / 0.06) 0%, transparent 65%)",
                 }}
                 aria-hidden="true"
               />
 
               {/* Card header */}
-              <div className="flex flex-col gap-2 relative">
+              <div className="flex flex-col gap-1.5 relative">
                 <div className="flex items-center gap-2">
                   <UserPlus className="size-5 text-accent" aria-hidden="true" />
                   <h2 className="font-display font-bold text-2xl text-foreground">
@@ -303,7 +329,6 @@ export default function RegisterPage() {
                 </p>
               </div>
 
-              {/* Separator */}
               <div className="h-px bg-border/30" />
 
               {/* ── Registration form ── */}
@@ -337,7 +362,7 @@ export default function RegisterPage() {
                     </motion.p>
                   )}
 
-                  {/* Email field */}
+                  {/* Email */}
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="reg-email"
@@ -383,7 +408,7 @@ export default function RegisterPage() {
                     )}
                   </div>
 
-                  {/* Password field */}
+                  {/* Password */}
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="reg-password"
@@ -446,7 +471,7 @@ export default function RegisterPage() {
                     )}
                   </div>
 
-                  {/* Confirm password field */}
+                  {/* Confirm password */}
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="reg-confirm"
@@ -513,6 +538,105 @@ export default function RegisterPage() {
                     )}
                   </div>
 
+                  {/* Security question */}
+                  <div className="flex flex-col gap-1.5">
+                    <label
+                      htmlFor="reg-security-question"
+                      className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"
+                    >
+                      <HelpCircle className="size-3" aria-hidden="true" />
+                      Security question
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="reg-security-question"
+                        value={securityQuestion}
+                        onChange={(e) => setSecurityQuestion(e.target.value)}
+                        disabled={isLoading}
+                        data-ocid="select-security-question"
+                        className="w-full pl-3 pr-8 py-2.5 rounded-xl bg-muted/30 border border-border/40 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50 transition-smooth disabled:opacity-50 appearance-none"
+                      >
+                        {SECURITY_QUESTIONS.map((q) => (
+                          <option
+                            key={q}
+                            value={q}
+                            className="bg-card text-foreground"
+                          >
+                            {q}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60">
+                        <svg
+                          className="size-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                          role="img"
+                        >
+                          <title>Expand</title>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Security answer */}
+                  <div className="flex flex-col gap-1.5">
+                    <label
+                      htmlFor="reg-security-answer"
+                      className="text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                    >
+                      Your answer
+                    </label>
+                    <div className="relative">
+                      <Shield
+                        className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/60 pointer-events-none"
+                        aria-hidden="true"
+                      />
+                      <input
+                        id="reg-security-answer"
+                        type="text"
+                        autoComplete="off"
+                        value={securityAnswer}
+                        onChange={(e) => {
+                          setSecurityAnswer(e.target.value);
+                          setSecurityAnswerError(null);
+                        }}
+                        onBlur={() =>
+                          setSecurityAnswerError(
+                            !securityAnswer.trim()
+                              ? "Security answer is required."
+                              : null,
+                          )
+                        }
+                        placeholder="Your answer (case-insensitive)"
+                        disabled={isLoading}
+                        data-ocid="input-security-answer"
+                        aria-describedby={
+                          securityAnswerError ? "reg-sec-err" : undefined
+                        }
+                        aria-invalid={!!securityAnswerError}
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl bg-muted/30 border text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50 transition-smooth disabled:opacity-50 ${securityAnswerError ? "border-destructive/50" : "border-border/40"}`}
+                      />
+                    </div>
+                    {securityAnswerError && (
+                      <p
+                        id="reg-sec-err"
+                        className="text-xs text-destructive"
+                        role="alert"
+                      >
+                        {securityAnswerError}
+                      </p>
+                    )}
+                  </div>
+
                   {/* ── Math CAPTCHA ── */}
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
@@ -535,7 +659,6 @@ export default function RegisterPage() {
                     </div>
 
                     <div className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
-                      {/* Math question display */}
                       <div
                         className="flex items-center gap-1.5 shrink-0"
                         aria-live="polite"
@@ -553,7 +676,6 @@ export default function RegisterPage() {
                         </span>
                       </div>
 
-                      {/* Answer input */}
                       <input
                         id="reg-captcha"
                         type="number"
@@ -589,7 +711,7 @@ export default function RegisterPage() {
                     )}
                   </div>
 
-                  {/* Submit button */}
+                  {/* Submit */}
                   <Button
                     type="submit"
                     disabled={!isFormValid || isLoading}
@@ -622,15 +744,7 @@ export default function RegisterPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-border/20 backdrop-blur-sm py-4 px-6 relative z-10">
         <p className="text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()}. Built with love using{" "}
-          <a
-            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:underline"
-          >
-            caffeine.ai
-          </a>
+          © {new Date().getFullYear()} AI Resume Screening Portal
         </p>
       </footer>
     </div>

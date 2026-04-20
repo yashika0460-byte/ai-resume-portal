@@ -1,6 +1,7 @@
 /**
- * DashboardPage — Admin dashboard showing all resumes, analytics, match history,
- * and user management. Includes CSV export, empty states, and consistent loading/error patterns.
+ * DashboardPage — Legacy admin dashboard.
+ * Styled with dark glass-morphism to match the rest of the admin portal.
+ * Keeps all legacy analytics: resumes tab, analytics/charts tab, users tab.
  */
 
 import { Button } from "@/components/ui/AppButton";
@@ -18,6 +19,7 @@ import { useActor } from "@caffeineai/core-infrastructure";
 import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  BarChart3,
   ChevronLeft,
   Download,
   FileText,
@@ -49,15 +51,15 @@ import { createActor } from "../backend";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getScoreColor(score: number): string {
-  if (score >= 70) return "oklch(0.72 0.18 198)";
-  if (score >= 40) return "oklch(0.72 0.16 70)";
-  return "oklch(0.63 0.22 16)";
+  if (score >= 70) return "oklch(0.62 0.22 151)";
+  if (score >= 40) return "oklch(0.72 0.16 79)";
+  return "oklch(0.62 0.22 22)";
 }
 
 function getScoreClass(score: number): string {
-  if (score >= 70) return "text-accent";
-  if (score >= 40) return "text-yellow-400";
-  return "text-destructive";
+  if (score >= 70) return "text-emerald-400";
+  if (score >= 40) return "text-amber-400";
+  return "text-red-400";
 }
 
 function formatDate(iso: string): string {
@@ -91,7 +93,6 @@ function exportToCSV(resumes: Resume[]) {
     `"${r.skills.join(", ")}"`,
     `"${formatDate(r.uploadDate)}"`,
   ]);
-
   const csv = [header.join(","), ...rows.map((r) => r.join(","))].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -118,13 +119,7 @@ function ConfirmDelete({
   isPending,
 }: ConfirmDeleteProps) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{
-        background: "oklch(0.60 0.014 240 / 0.25)",
-        backdropFilter: "blur(8px)",
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
       <GlassCard
         className="max-w-sm w-full mx-4 flex flex-col gap-5"
         data-ocid="confirm-delete-modal"
@@ -137,8 +132,7 @@ function ConfirmDelete({
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">
           <span className="text-foreground font-medium">{resume.filename}</span>{" "}
-          will be permanently removed along with its match history. This cannot
-          be undone.
+          will be permanently removed along with its match history.
         </p>
         <div className="flex justify-end gap-3">
           <Button
@@ -177,7 +171,7 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   const item = payload[0];
   return (
-    <div className="glass rounded-lg px-3 py-2 text-sm">
+    <div className="glass rounded-lg px-3 py-2 text-sm border border-border/30">
       <p className="font-medium text-foreground truncate max-w-[180px]">
         {item.payload.filename}
       </p>
@@ -194,7 +188,6 @@ function StatsBar({ resumes }: { resumes: Resume[] }) {
     ? Math.round(resumes.reduce((s, r) => s + r.score, 0) / total)
     : 0;
   const top = total ? Math.max(...resumes.map((r) => r.score)) : 0;
-
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <StatCard
@@ -226,12 +219,14 @@ function ScoreChart({ resumes }: { resumes: Resume[] }) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 12)
     .map((r) => ({ filename: r.filename, score: r.score }));
-
   return (
     <GlassCard data-ocid="score-chart" className="flex flex-col gap-4">
-      <h2 className="font-display font-semibold text-foreground text-lg">
-        Resume Score Distribution
-      </h2>
+      <div className="flex items-center gap-2">
+        <BarChart3 className="size-4 text-indigo-400" />
+        <h2 className="font-display font-semibold text-foreground text-lg">
+          Resume Score Distribution
+        </h2>
+      </div>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={data}
@@ -239,14 +234,14 @@ function ScoreChart({ resumes }: { resumes: Resume[] }) {
         >
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="oklch(0.22 0.012 240 / 0.4)"
+            stroke="oklch(0.20 0.012 264 / 0.5)"
             vertical={false}
           />
           <XAxis
             dataKey="filename"
             tickFormatter={(v: string) => truncateFilename(v, 10)}
             tick={{
-              fill: "oklch(0.62 0.02 240)",
+              fill: "oklch(0.62 0.02 264)",
               fontSize: 11,
               fontFamily: "var(--font-mono)",
             }}
@@ -256,7 +251,7 @@ function ScoreChart({ resumes }: { resumes: Resume[] }) {
           <YAxis
             domain={[0, 100]}
             tick={{
-              fill: "oklch(0.62 0.02 240)",
+              fill: "oklch(0.62 0.02 264)",
               fontSize: 11,
               fontFamily: "var(--font-mono)",
             }}
@@ -265,7 +260,7 @@ function ScoreChart({ resumes }: { resumes: Resume[] }) {
           />
           <Tooltip
             content={<ChartTooltip />}
-            cursor={{ fill: "oklch(0.72 0.18 198 / 0.06)" }}
+            cursor={{ fill: "oklch(0.53 0.22 264 / 0.08)" }}
           />
           <Bar dataKey="score" radius={[4, 4, 0, 0]}>
             {data.map((entry) => (
@@ -302,7 +297,7 @@ function DashboardEmpty() {
         </p>
         <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
           Upload your first candidate resume and the AI will extract skills,
-          compute a match score, and populate this dashboard automatically.
+          compute a match score, and populate this dashboard.
         </p>
       </div>
       <div className="flex flex-col sm:flex-row gap-3 mt-1">
@@ -319,33 +314,19 @@ function DashboardEmpty() {
           </Link>
         </Button>
       </div>
-      <div className="mt-2 flex flex-col sm:flex-row items-center gap-6 text-xs text-muted-foreground/60">
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          Drag-and-drop PDF upload
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          44 tech skills extracted automatically
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
-          AI scoring out of 100
-        </span>
-      </div>
     </GlassCard>
   );
 }
 
-// ─── Score tier filter presets ─────────────────────────────────────────────────
+// ─── Score tier filter ─────────────────────────────────────────────────────────
 
 type ScoreTier = "all" | "high" | "medium" | "low";
 
 const SCORE_TIERS: { key: ScoreTier; label: string; className: string }[] = [
   { key: "all", label: "All", className: "" },
-  { key: "high", label: "High (70+)", className: "text-accent" },
-  { key: "medium", label: "Medium (40–69)", className: "text-yellow-400" },
-  { key: "low", label: "Low (<40)", className: "text-destructive" },
+  { key: "high", label: "High (70+)", className: "text-emerald-400" },
+  { key: "medium", label: "Medium (40–69)", className: "text-amber-400" },
+  { key: "low", label: "Low (<40)", className: "text-red-400" },
 ];
 
 function matchesTier(score: number, tier: ScoreTier): boolean {
@@ -357,28 +338,23 @@ function matchesTier(score: number, tier: ScoreTier): boolean {
 
 // ─── Resume table ─────────────────────────────────────────────────────────────
 
-interface ResumeTableProps {
-  resumes: Resume[];
-  onDelete: (r: Resume) => void;
-}
-
-function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
+function ResumeTable({
+  resumes,
+  onDelete,
+}: { resumes: Resume[]; onDelete: (r: Resume) => void }) {
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<ScoreTier>("all");
 
   const sorted = [...resumes].sort((a, b) => b.score - a.score);
-  const filtered = sorted.filter((r) => {
-    const matchesSearch = r.filename
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    return matchesSearch && matchesTier(r.score, tier);
-  });
+  const filtered = sorted.filter(
+    (r) =>
+      r.filename.toLowerCase().includes(search.toLowerCase()) &&
+      matchesTier(r.score, tier),
+  );
 
   return (
     <GlassCard className="overflow-hidden p-0" data-ocid="resume-table">
-      {/* ── Search + filter bar ── */}
-      <div className="px-4 py-3 flex flex-col sm:flex-row gap-3 border-b border-border/20">
-        {/* Text search */}
+      <div className="px-4 py-3 flex flex-col sm:flex-row gap-3 border-b border-border/20 bg-muted/20">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
           <input
@@ -386,12 +362,10 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by filename…"
-            className="w-full bg-muted/30 border border-border/30 rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/50 transition-colors duration-200"
+            className="w-full bg-muted/20 border border-border/30 rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/50 transition-colors duration-200"
             data-ocid="filter-search"
           />
         </div>
-
-        {/* Score tier filter */}
         <div className="flex gap-1 shrink-0">
           {SCORE_TIERS.map(({ key, label, className }) => (
             <button
@@ -399,24 +373,17 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
               type="button"
               onClick={() => setTier(key)}
               data-ocid={`filter-tier-${key}`}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors duration-200 border ${
-                tier === key
-                  ? "bg-accent/15 border-accent/30 text-accent"
-                  : `border-border/30 text-muted-foreground hover:bg-muted/40 hover:text-foreground ${className}`
-              }`}
+              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors duration-200 border ${tier === key ? "bg-accent/15 border-accent/30 text-accent" : `border-border/30 text-muted-foreground hover:bg-muted/40 hover:text-foreground ${className}`}`}
             >
               {label}
             </button>
           ))}
         </div>
       </div>
-
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr
-              style={{ borderBottom: "1px solid oklch(0.22 0.012 240 / 0.4)" }}
-            >
+            <tr className="border-b border-border/20 bg-muted/30">
               {["#", "Filename", "Score", "Skills", "Actions"].map((col) => (
                 <th
                   key={col}
@@ -440,24 +407,18 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
               filtered.map((resume, idx) => (
                 <tr
                   key={resume.id}
-                  className="glass-hover"
-                  style={{
-                    borderBottom: "1px solid oklch(0.22 0.012 240 / 0.2)",
-                  }}
+                  className="border-b border-border/10 hover:bg-muted/10 transition-colors"
                   data-ocid={`resume-row-${idx}`}
                 >
-                  {/* Rank */}
                   <td className="px-4 py-3.5 w-10">
                     <span className="text-muted-foreground font-mono text-xs">
                       {idx + 1}
                     </span>
                   </td>
-
-                  {/* Filename */}
                   <td className="px-4 py-3.5 min-w-[160px]">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0">
-                        <FileText className="size-3.5 text-primary" />
+                      <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 shrink-0">
+                        <FileText className="size-3.5 text-indigo-400" />
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-foreground truncate max-w-[200px]">
@@ -469,8 +430,6 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
                       </div>
                     </div>
                   </td>
-
-                  {/* Score */}
                   <td className="px-4 py-3.5 w-32">
                     <div className="flex flex-col gap-1.5">
                       <span
@@ -478,16 +437,17 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
                       >
                         {resume.score}
                       </span>
-                      <div className="score-bar w-20">
+                      <div className="h-1.5 w-20 rounded-full bg-muted/30 overflow-hidden">
                         <div
-                          className="score-bar-fill"
-                          style={{ width: `${Math.min(resume.score, 100)}%` }}
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.min(resume.score, 100)}%`,
+                            background: getScoreColor(resume.score),
+                          }}
                         />
                       </div>
                     </div>
                   </td>
-
-                  {/* Skills */}
                   <td className="px-4 py-3.5 max-w-[280px]">
                     <div className="flex flex-wrap gap-1">
                       {resume.skills.slice(0, 5).map((skill) => (
@@ -501,8 +461,6 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
                       )}
                     </div>
                   </td>
-
-                  {/* Actions */}
                   <td className="px-4 py-3.5 w-28">
                     <div className="flex items-center gap-2">
                       {resume.fileUrl && (
@@ -510,7 +468,7 @@ function ResumeTable({ resumes, onDelete }: ResumeTableProps) {
                           variant="ghost"
                           size="icon"
                           asChild
-                          className="size-8 text-accent hover:bg-accent/10 hover:text-accent"
+                          className="size-8 text-accent hover:bg-accent/10"
                           data-ocid={`download-btn-${idx}`}
                         >
                           <a
@@ -560,19 +518,15 @@ function MatchHistorySection({ matches }: { matches: MatchRecord[] }) {
       </GlassCard>
     );
   }
-
   const sorted = [...matches].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
-
   return (
     <GlassCard className="overflow-hidden p-0" data-ocid="match-history-table">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr
-              style={{ borderBottom: "1px solid oklch(0.22 0.012 240 / 0.4)" }}
-            >
+            <tr className="border-b border-border/20 bg-muted/30">
               {["Resume", "Match Score", "Matched Skills", "Date"].map(
                 (col) => (
                   <th
@@ -589,10 +543,7 @@ function MatchHistorySection({ matches }: { matches: MatchRecord[] }) {
             {sorted.map((match, idx) => (
               <tr
                 key={match.id}
-                className="glass-hover"
-                style={{
-                  borderBottom: "1px solid oklch(0.22 0.012 240 / 0.2)",
-                }}
+                className="border-b border-border/10 hover:bg-muted/10 transition-colors"
                 data-ocid={`match-row-${idx}`}
               >
                 <td className="px-4 py-3.5 max-w-[200px]">
@@ -649,23 +600,27 @@ function DashboardSkeleton() {
 
 type DashboardTab = "resumes" | "analytics" | "users";
 
-interface TabButtonProps {
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  ocid,
+}: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
   ocid: string;
-}
-
-function TabButton({ active, onClick, icon, label, ocid }: TabButtonProps) {
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       data-ocid={ocid}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 border ${
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 border ${
         active
-          ? "bg-accent/15 border-accent/30 text-accent"
+          ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300"
           : "border-border/30 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
       }`}
     >
@@ -677,27 +632,19 @@ function TabButton({ active, onClick, icon, label, ocid }: TabButtonProps) {
 
 // ─── Confirm Delete User Modal ────────────────────────────────────────────────
 
-interface ConfirmDeleteUserProps {
-  userEmail: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isPending: boolean;
-}
-
 function ConfirmDeleteUser({
   userEmail,
   onConfirm,
   onCancel,
   isPending,
-}: ConfirmDeleteUserProps) {
+}: {
+  userEmail: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{
-        background: "oklch(0.60 0.014 240 / 0.25)",
-        backdropFilter: "blur(8px)",
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
       <GlassCard
         className="max-w-sm w-full mx-4 flex flex-col gap-5"
         data-ocid="confirm-delete-user-modal"
@@ -740,15 +687,12 @@ function ConfirmDeleteUser({
 
 // ─── Users tab section ────────────────────────────────────────────────────────
 
-interface UsersTabProps {
-  token: string;
-  currentUserEmail: string;
-}
-
-function UsersTab({ token, currentUserEmail }: UsersTabProps) {
+function UsersTab({
+  token,
+  currentUserEmail,
+}: { token: string; currentUserEmail: string }) {
   const { actor: rawActor } = useActor(createActor);
   const actor = rawActor as BackendActor | null;
-
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -761,11 +705,8 @@ function UsersTab({ token, currentUserEmail }: UsersTabProps) {
     setIsLoading(true);
     setError(null);
     const result = await apiListUsers(actor, token);
-    if (result.success && result.users) {
-      setUsers(result.users);
-    } else {
-      setError(result.error ?? "Failed to load users");
-    }
+    if (result.success && result.users) setUsers(result.users);
+    else setError(result.error ?? "Failed to load users");
     setIsLoading(false);
   }, [actor, token]);
 
@@ -777,11 +718,9 @@ function UsersTab({ token, currentUserEmail }: UsersTabProps) {
     if (!pendingDelete || !actor) return;
     setIsDeleting(true);
     const result = await apiDeleteUser(actor, token, pendingDelete);
-    if (result.success) {
+    if (result.success)
       setUsers((prev) => prev.filter((u) => u.email !== pendingDelete));
-    } else {
-      setError(result.error ?? "Failed to delete user");
-    }
+    else setError(result.error ?? "Failed to delete user");
     setIsDeleting(false);
     setPendingDelete(null);
   };
@@ -807,10 +746,8 @@ function UsersTab({ token, currentUserEmail }: UsersTabProps) {
           {error}
         </div>
       )}
-
       <GlassCard className="overflow-hidden p-0" data-ocid="users-table">
-        {/* Search bar */}
-        <div className="px-4 py-3 border-b border-border/20">
+        <div className="px-4 py-3 border-b border-border/20 bg-muted/20">
           <div className="relative max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
             <input
@@ -818,20 +755,15 @@ function UsersTab({ token, currentUserEmail }: UsersTabProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by email…"
-              className="w-full bg-muted/30 border border-border/30 rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/50 transition-colors duration-200"
+              className="w-full bg-muted/20 border border-border/30 rounded-lg pl-8 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/50 transition-colors duration-200"
               data-ocid="users-search"
             />
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr
-                style={{
-                  borderBottom: "1px solid oklch(0.22 0.012 240 / 0.4)",
-                }}
-              >
+              <tr className="border-b border-border/20 bg-muted/30">
                 {["Email", "Role", "Date Joined", "Actions"].map((col) => (
                   <th
                     key={col}
@@ -863,47 +795,37 @@ function UsersTab({ token, currentUserEmail }: UsersTabProps) {
                 filtered.map((u, idx) => (
                   <tr
                     key={u.email}
-                    className="glass-hover"
-                    style={{
-                      borderBottom: "1px solid oklch(0.22 0.012 240 / 0.2)",
-                    }}
+                    className="border-b border-border/10 hover:bg-muted/10 transition-colors"
                     data-ocid={`user-row-${idx}`}
                   >
-                    {/* Email */}
                     <td className="px-4 py-3.5 min-w-[200px]">
                       <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0">
-                          <User className="size-3.5 text-primary" />
+                        <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 shrink-0">
+                          <User className="size-3.5 text-indigo-400" />
                         </div>
                         <span className="font-medium text-foreground truncate max-w-[240px]">
                           {u.email}
                         </span>
                       </div>
                     </td>
-
-                    {/* Role badge */}
                     <td className="px-4 py-3.5 w-28">
                       {u.role === "admin" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/15 border border-accent/30 text-accent">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 border border-indigo-500/25 text-indigo-300">
                           <Shield className="size-3" />
                           Admin
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted/40 border border-border/30 text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/10 border border-slate-500/25 text-slate-400">
                           <User className="size-3" />
                           User
                         </span>
                       )}
                     </td>
-
-                    {/* Date joined */}
                     <td className="px-4 py-3.5 w-36">
                       <span className="text-muted-foreground text-xs">
                         {formatDate(u.createdAt)}
                       </span>
                     </td>
-
-                    {/* Delete action */}
                     <td className="px-4 py-3.5 w-20">
                       {u.email.toLowerCase() !==
                       currentUserEmail.toLowerCase() ? (
@@ -930,7 +852,6 @@ function UsersTab({ token, currentUserEmail }: UsersTabProps) {
           </table>
         </div>
       </GlassCard>
-
       {pendingDelete && (
         <ConfirmDeleteUser
           userEmail={pendingDelete}
@@ -955,7 +876,6 @@ export default function DashboardPage() {
   const [pendingDelete, setPendingDelete] = useState<Resume | null>(null);
 
   const handleDeleteClick = (resume: Resume) => setPendingDelete(resume);
-
   const handleDeleteConfirm = () => {
     if (!pendingDelete) return;
     deleteMutation.mutate(pendingDelete.id, {
@@ -972,7 +892,7 @@ export default function DashboardPage() {
       className="min-h-screen gradient-flow bg-grid-pattern"
       data-ocid="dashboard-page"
     >
-      {/* ── Back button ── */}
+      {/* Back button */}
       <button
         type="button"
         onClick={() => window.history.back()}
@@ -987,8 +907,8 @@ export default function DashboardPage() {
         {/* Page header */}
         <div className="flex items-center justify-between gap-4 fade-up">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25">
-              <LayoutDashboard className="size-5 text-accent" />
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/25">
+              <LayoutDashboard className="size-5 text-indigo-400" />
             </div>
             <div>
               <h1 className="font-display font-bold text-2xl text-foreground">
@@ -1018,7 +938,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Tab bar ── */}
+        {/* Tab bar */}
         <div
           className="flex gap-2 flex-wrap fade-up"
           style={{ animationDelay: "0.03s" }}
@@ -1046,7 +966,7 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* ── Resumes tab ── */}
+        {/* Resumes tab */}
         {activeTab === "resumes" &&
           (isLoading ? (
             <DashboardSkeleton />
@@ -1056,19 +976,16 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* KPI stats */}
               <section className="fade-up" style={{ animationDelay: "0.05s" }}>
                 <StatsBar resumes={resumes} />
               </section>
-
-              {/* Resume table + mobile export button */}
               <section
                 className="fade-up flex flex-col gap-3"
                 style={{ animationDelay: "0.1s" }}
               >
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="font-display font-semibold text-lg text-foreground">
-                    All Resumes
+                    All Resumes{" "}
                     <span className="ml-2 text-xs font-normal text-muted-foreground font-body">
                       sorted by score
                     </span>
@@ -1078,7 +995,7 @@ export default function DashboardPage() {
                     size="sm"
                     onClick={() => exportToCSV(resumes)}
                     data-ocid="btn-export-csv-mobile"
-                    className="sm:hidden flex gap-2 border-border/40 hover:border-accent/40 hover:text-accent"
+                    className="sm:hidden flex gap-2 border-border/40"
                   >
                     <Download className="size-4" />
                     CSV
@@ -1089,7 +1006,7 @@ export default function DashboardPage() {
             </>
           ))}
 
-        {/* ── Analytics tab ── */}
+        {/* Analytics tab */}
         {activeTab === "analytics" &&
           (isLoading ? (
             <DashboardSkeleton />
@@ -1117,25 +1034,21 @@ export default function DashboardPage() {
             </>
           ))}
 
-        {/* ── Users tab ── */}
+        {/* Users tab */}
         {activeTab === "users" && user && (
           <section className="fade-up" style={{ animationDelay: "0.05s" }}>
             <UsersTab token={user.token} currentUserEmail={user.email} />
           </section>
         )}
 
-        {/* Loading overlay for delete in progress */}
+        {/* Loading overlay for delete */}
         {deleteMutation.isPending && !pendingDelete && (
-          <div
-            className="fixed inset-0 z-40 flex items-center justify-center"
-            style={{ background: "oklch(0.60 0.014 240 / 0.20)" }}
-          >
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
             <LoadingSpinner size="lg" label="Deleting resume…" />
           </div>
         )}
       </div>
 
-      {/* Confirm delete dialog */}
       {pendingDelete && (
         <ConfirmDelete
           resume={pendingDelete}

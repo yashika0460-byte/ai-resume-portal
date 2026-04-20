@@ -1,17 +1,7 @@
 /**
- * AdminMatchingPage.tsx — Job Matching dashboard for the admin portal.
- *
- * Layout:
- *  Left panel  — list of unique job descriptions from match history
- *  Right panel — match results table for selected JD with filters, sort, CSV export
- *
- * Features:
- *  • Run new match modal (single resume + JD)
- *  • Bulk match (multi-resume checklist + JD → progress per resume)
- *  • Score color coding: <40 red, 40–70 yellow, >70 green
- *  • Filter by score range and candidate name search
- *  • Sort by score (desc default) or match date
- *  • CSV export for selected JD results
+ * AdminMatchingPage.tsx — Job Matching dashboard with mini circular match gauges.
+ * Dark glass card, JD textarea, ranked results with circular score gauges,
+ * skill chip columns, CSV download, loading states.
  */
 
 import { useActor } from "@caffeineai/core-infrastructure";
@@ -21,7 +11,6 @@ import {
   Briefcase,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   ChevronUp,
   Download,
   FileText,
@@ -50,16 +39,16 @@ import type { MatchRecord, Resume } from "../../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function scoreColor(score: number): string {
-  if (score >= 70) return "text-emerald-700";
-  if (score >= 40) return "text-amber-600";
-  return "text-rose-600";
+function scoreColorClass(score: number): string {
+  if (score >= 70) return "text-emerald-400";
+  if (score >= 40) return "text-amber-400";
+  return "text-red-400";
 }
 
-function scoreBg(score: number): string {
-  if (score >= 70) return "bg-emerald-500";
-  if (score >= 40) return "bg-amber-400";
-  return "bg-rose-500";
+function scoreStroke(score: number): string {
+  if (score >= 70) return "#34d399";
+  if (score >= 40) return "#fbbf24";
+  return "#f87171";
 }
 
 function formatDate(iso: string): string {
@@ -99,45 +88,47 @@ function exportToCSV(records: MatchRecord[]): void {
   URL.revokeObjectURL(url);
 }
 
-// ─── Unique JD list from match history ───────────────────────────────────────
+// ─── Circular Match Gauge (mini 36px) ─────────────────────────────────────────
 
-interface JDEntry {
-  jd: string;
-  count: number;
-  lastDate: string;
-}
+function CircularGauge({ score, size = 36 }: { score: number; size?: number }) {
+  const r = (size - 6) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (score / 100) * circ;
+  const center = size / 2;
 
-function buildJDList(records: MatchRecord[]): JDEntry[] {
-  const map = new Map<string, { count: number; lastDate: string }>();
-  for (const r of records) {
-    const existing = map.get(r.jobDescription);
-    if (!existing) {
-      map.set(r.jobDescription, { count: 1, lastDate: r.createdAt });
-    } else {
-      existing.count += 1;
-      if (r.createdAt > existing.lastDate) existing.lastDate = r.createdAt;
-    }
-  }
-  return Array.from(map.entries())
-    .map(([jd, meta]) => ({ jd, ...meta }))
-    .sort((a, b) => b.lastDate.localeCompare(a.lastDate));
-}
-
-// ─── Score bar ────────────────────────────────────────────────────────────────
-
-function ScoreBar({ score }: { score: number }) {
   return (
-    <div className="flex items-center gap-3 min-w-[120px]">
-      <div className="flex-1 h-1.5 rounded-full bg-muted/50 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${scoreBg(score)}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <span
-        className={`text-sm font-semibold font-mono w-10 text-right ${scoreColor(score)}`}
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        aria-hidden="true"
       >
-        {score}%
+        <circle
+          cx={center}
+          cy={center}
+          r={r}
+          stroke="oklch(0.20 0.01 264)"
+          strokeWidth={4}
+          fill="none"
+        />
+        <circle
+          cx={center}
+          cy={center}
+          r={r}
+          stroke={scoreStroke(score)}
+          strokeWidth={4}
+          fill="none"
+          strokeDasharray={`${dash} ${circ}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${center} ${center})`}
+          style={{ transition: "stroke-dasharray 0.7s ease" }}
+        />
+      </svg>
+      <span
+        className={`absolute inset-0 flex items-center justify-center text-[9px] font-bold font-mono ${scoreColorClass(score)}`}
+      >
+        {score}
       </span>
     </div>
   );
@@ -153,16 +144,19 @@ function SkillList({
   const shown = expanded ? skills : skills.slice(0, 3);
   if (skills.length === 0)
     return <span className="text-xs text-muted-foreground">—</span>;
+  const cls =
+    variant === "matched"
+      ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/25"
+      : "bg-red-500/10 text-red-300 border-red-500/25";
   return (
     <div className="flex flex-wrap gap-1">
       {shown.map((s) => (
-        <Badge
+        <span
           key={s}
-          variant={variant === "matched" ? "default" : "destructive"}
-          className="text-xs py-0"
+          className={`text-[10px] px-1.5 py-0.5 rounded-md border font-medium ${cls}`}
         >
           {s}
-        </Badge>
+        </span>
       ))}
       {skills.length > 3 && (
         <button
@@ -175,6 +169,30 @@ function SkillList({
       )}
     </div>
   );
+}
+
+// ─── Unique JD list from match history ───────────────────────────────────────
+
+interface JDEntry {
+  jd: string;
+  count: number;
+  lastDate: string;
+}
+
+function buildJDList(records: MatchRecord[]): JDEntry[] {
+  const map = new Map<string, { count: number; lastDate: string }>();
+  for (const r of records) {
+    const existing = map.get(r.jobDescription);
+    if (!existing)
+      map.set(r.jobDescription, { count: 1, lastDate: r.createdAt });
+    else {
+      existing.count += 1;
+      if (r.createdAt > existing.lastDate) existing.lastDate = r.createdAt;
+    }
+  }
+  return Array.from(map.entries())
+    .map(([jd, meta]) => ({ jd, ...meta }))
+    .sort((a, b) => b.lastDate.localeCompare(a.lastDate));
 }
 
 // ─── Run Match Modal ──────────────────────────────────────────────────────────
@@ -243,7 +261,6 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
             <X className="size-4 text-muted-foreground" />
           </button>
         </div>
-
         <div className="space-y-4">
           <div className="space-y-1.5">
             <label
@@ -254,7 +271,7 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
             </label>
             <select
               id="run-match-resume"
-              className="w-full rounded-xl bg-muted/20 border border-border/30 px-3 py-2.5 text-sm text-foreground outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-smooth"
+              className="w-full rounded-xl bg-muted/20 border border-border/30 px-3 py-2.5 text-sm text-foreground outline-none focus:border-accent/40 transition-smooth"
               value={resumeId}
               onChange={(e) => setResumeId(e.target.value)}
               data-ocid="run-match.resume_select"
@@ -270,7 +287,6 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
               )}
             </select>
           </div>
-
           <div className="space-y-1.5">
             <label
               htmlFor="run-match-jd"
@@ -281,7 +297,7 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
             <textarea
               id="run-match-jd"
               rows={6}
-              className="w-full rounded-xl bg-muted/20 border border-border/30 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 resize-none transition-smooth"
+              className="w-full rounded-xl bg-muted/20 border border-border/30 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-accent/40 resize-none transition-smooth"
               placeholder="Paste the job description here…"
               value={jd}
               onChange={(e) => {
@@ -291,7 +307,6 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
               data-ocid="run-match.jd_textarea"
             />
           </div>
-
           {error && (
             <div
               className="flex items-center gap-2 text-destructive text-sm"
@@ -301,18 +316,16 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
               {error}
             </div>
           )}
-
           {success && (
             <div
-              className="flex items-center gap-2 text-emerald-700 text-sm"
+              className="flex items-center gap-2 text-emerald-400 text-sm"
               data-ocid="run-match.success_state"
             >
               <CheckCircle2 className="size-4 shrink-0" />
-              Match completed successfully!
+              Match completed!
             </div>
           )}
         </div>
-
         <div className="flex gap-3 justify-end">
           <Button
             variant="outline"
@@ -346,12 +359,6 @@ function RunMatchModal({ resumes, onClose, onDone }: RunMatchModalProps) {
 
 // ─── Bulk Match Modal ─────────────────────────────────────────────────────────
 
-interface BulkMatchModalProps {
-  resumes: Resume[];
-  onClose: () => void;
-  onDone: () => void;
-}
-
 interface BulkProgress {
   resumeId: string;
   filename: string;
@@ -359,18 +366,23 @@ interface BulkProgress {
   score?: number;
   error?: string;
 }
+interface BulkMatchModalProps {
+  resumes: Resume[];
+  onClose: () => void;
+  onDone: () => void;
+}
 
 function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
   const { actor } = useActor(createActor);
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [jd, setJd] = useState("");
   const [progress, setProgress] = useState<BulkProgress[] | null>(null);
   const [isRunning, setIsRunning] = useState(false);
 
   const toggleResume = (id: string) => {
-    setSelected((prev) => {
+    setBulkSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -378,19 +390,15 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
     });
   };
 
-  const selectAll = () => setSelected(new Set(resumes.map((r) => r.id)));
-  const clearAll = () => setSelected(new Set());
-
   const runBulk = async () => {
-    if (!actor || !user?.token || selected.size === 0 || !jd.trim()) return;
+    if (!actor || !user?.token || bulkSelected.size === 0 || !jd.trim()) return;
     setIsRunning(true);
-    const items: BulkProgress[] = Array.from(selected).map((id) => ({
+    const items: BulkProgress[] = Array.from(bulkSelected).map((id) => ({
       resumeId: id,
       filename: resumes.find((r) => r.id === id)?.filename ?? id,
       status: "pending",
     }));
     setProgress(items);
-
     for (let i = 0; i < items.length; i++) {
       setProgress((prev) =>
         prev!.map((p, idx) => (idx === i ? { ...p, status: "running" } : p)),
@@ -460,19 +468,20 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
             </button>
           )}
         </div>
-
         {!progress ? (
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-foreground">
-                  Select Resumes ({selected.size} of {resumes.length})
+                  Select Resumes ({bulkSelected.size} of {resumes.length})
                 </span>
                 <div className="flex gap-2 text-xs">
                   <button
                     type="button"
                     className="text-accent hover:underline"
-                    onClick={selectAll}
+                    onClick={() =>
+                      setBulkSelected(new Set(resumes.map((r) => r.id)))
+                    }
                     data-ocid="bulk-match.select_all"
                   >
                     All
@@ -480,7 +489,7 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
                   <button
                     type="button"
                     className="text-muted-foreground hover:underline"
-                    onClick={clearAll}
+                    onClick={() => setBulkSelected(new Set())}
                     data-ocid="bulk-match.clear_all"
                   >
                     Clear
@@ -501,7 +510,7 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
                     >
                       <input
                         type="checkbox"
-                        checked={selected.has(r.id)}
+                        checked={bulkSelected.has(r.id)}
                         onChange={() => toggleResume(r.id)}
                         className="rounded accent-accent"
                       />
@@ -516,7 +525,6 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
                 )}
               </div>
             </div>
-
             <div className="space-y-1.5">
               <label
                 htmlFor="bulk-match-jd"
@@ -527,14 +535,13 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
               <textarea
                 id="bulk-match-jd"
                 rows={5}
-                className="w-full rounded-xl bg-muted/20 border border-border/30 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 resize-none transition-smooth"
+                className="w-full rounded-xl bg-muted/20 border border-border/30 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-accent/40 resize-none transition-smooth"
                 placeholder="Paste the job description here…"
                 value={jd}
                 onChange={(e) => setJd(e.target.value)}
                 data-ocid="bulk-match.jd_textarea"
               />
             </div>
-
             <div className="flex gap-3 justify-end">
               <Button
                 variant="outline"
@@ -545,12 +552,14 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
               </Button>
               <Button
                 onClick={runBulk}
-                disabled={selected.size === 0 || !jd.trim()}
+                disabled={bulkSelected.size === 0 || !jd.trim()}
                 data-ocid="bulk-match.submit_button"
               >
                 <Layers className="size-4 mr-2" />
                 Match{" "}
-                {selected.size > 0 ? `${selected.size} Resumes` : "Resumes"}
+                {bulkSelected.size > 0
+                  ? `${bulkSelected.size} Resumes`
+                  : "Resumes"}
               </Button>
             </div>
           </div>
@@ -574,7 +583,7 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
                     <Loader2 className="size-4 text-accent animate-spin shrink-0" />
                   )}
                   {p.status === "done" && (
-                    <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
                   )}
                   {p.status === "error" && (
                     <XCircle className="size-4 text-destructive shrink-0" />
@@ -584,7 +593,7 @@ function BulkMatchModal({ resumes, onClose, onDone }: BulkMatchModalProps) {
                   </span>
                   {p.status === "done" && p.score !== undefined && (
                     <span
-                      className={`text-sm font-semibold font-mono ml-auto ${scoreColor(p.score)}`}
+                      className={`text-sm font-semibold font-mono ml-auto ${scoreColorClass(p.score)}`}
                     >
                       {p.score}%
                     </span>
@@ -631,7 +640,6 @@ export default function AdminMatchingPage() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [deletedJDs, setDeletedJDs] = useState<Set<string>>(new Set());
 
-  // Build unique JD list
   const jdList = useMemo(() => {
     const filtered = matchHistory.filter(
       (r) => !deletedJDs.has(r.jobDescription),
@@ -639,7 +647,6 @@ export default function AdminMatchingPage() {
     return buildJDList(filtered);
   }, [matchHistory, deletedJDs]);
 
-  // Results for selected JD
   const filteredResults = useMemo(() => {
     if (!selectedJD) return [];
     let results = matchHistory.filter(
@@ -674,9 +681,9 @@ export default function AdminMatchingPage() {
 
   const handleSort = useCallback(
     (field: SortField) => {
-      if (sortField === field) {
+      if (sortField === field)
         setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
-      } else {
+      else {
         setSortField(field);
         setSortOrder("desc");
       }
@@ -701,18 +708,7 @@ export default function AdminMatchingPage() {
       className="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6 fade-up"
       data-ocid="admin-matching.page"
     >
-      {/* ── Back button ── */}
-      <button
-        type="button"
-        onClick={() => window.history.back()}
-        aria-label="Go back"
-        data-ocid="admin-matching.back_button"
-        className="fixed top-4 left-4 z-50 flex items-center justify-center size-9 rounded-xl bg-muted/30 border border-border/40 text-muted-foreground hover:text-accent hover:border-accent/50 hover:bg-accent/10 backdrop-blur-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-      >
-        <ChevronLeft className="size-5" aria-hidden="true" />
-      </button>
-
-      {/* ── Page header ── */}
+      {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="p-2.5 rounded-xl bg-accent/15 border border-accent/30 shrink-0 mt-0.5">
@@ -764,7 +760,6 @@ export default function AdminMatchingPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
             Job Descriptions
           </p>
-
           {histLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
@@ -805,7 +800,7 @@ export default function AdminMatchingPage() {
                   transition={{ delay: idx * 0.05 }}
                   className={`glass rounded-2xl border p-4 cursor-pointer transition-smooth group relative ${
                     selectedJD === entry.jd
-                      ? "border-accent/40 bg-accent/5 accent-glow"
+                      ? "border-accent/40 bg-accent/5"
                       : "border-border/20 hover:border-accent/20"
                   }`}
                   onClick={() =>
@@ -865,12 +860,12 @@ export default function AdminMatchingPage() {
               <p className="text-sm text-muted-foreground max-w-xs">
                 {jdList.length > 0
                   ? "Choose a job description from the left panel to see match results."
-                  : "Run your first match to see how candidates compare against a job description."}
+                  : "Run your first match to see how candidates compare."}
               </p>
             </div>
           ) : (
             <>
-              {/* JD preview + actions */}
+              {/* JD preview */}
               <div className="glass rounded-2xl border border-border/20 p-4 space-y-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-2">
@@ -944,12 +939,11 @@ export default function AdminMatchingPage() {
                 className="glass rounded-2xl border border-border/20 overflow-hidden"
                 data-ocid="admin-matching.results_table"
               >
-                {/* Table header */}
-                <div className="px-5 py-3 border-b border-border/15 grid grid-cols-[2fr_1.5fr_1.5fr_1.5fr_1fr] gap-4 text-xs font-semibold text-muted-foreground">
+                <div className="px-5 py-3.5 border-b border-border/15 bg-muted/30 grid grid-cols-[2fr_80px_1.5fr_1.5fr_1fr] gap-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <span>Candidate</span>
                   <button
                     type="button"
-                    className="flex items-center gap-1 hover:text-foreground transition-smooth"
+                    className="flex items-center gap-1 hover:text-foreground transition-smooth text-left"
                     onClick={() => handleSort("score")}
                     data-ocid="admin-matching.sort_score"
                   >
@@ -959,7 +953,7 @@ export default function AdminMatchingPage() {
                   <span>Missing Skills</span>
                   <button
                     type="button"
-                    className="flex items-center gap-1 hover:text-foreground transition-smooth"
+                    className="flex items-center gap-1 hover:text-foreground transition-smooth text-left"
                     onClick={() => handleSort("date")}
                     data-ocid="admin-matching.sort_date"
                   >
@@ -1001,32 +995,28 @@ export default function AdminMatchingPage() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ delay: idx * 0.03 }}
-                          className="px-5 py-4 border-b border-border/10 last:border-0 grid grid-cols-[2fr_1.5fr_1.5fr_1.5fr_1fr] gap-4 items-start hover:bg-muted/20 transition-smooth"
+                          className="px-5 py-4 border-b border-border/10 last:border-0 grid grid-cols-[2fr_80px_1.5fr_1.5fr_1fr] gap-4 items-start hover:bg-muted/15 transition-smooth"
                           data-ocid={`admin-matching.result_row.${idx + 1}`}
                         >
-                          {/* Candidate */}
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">
                               {record.resumeName}
                             </p>
                           </div>
-
-                          {/* Score */}
-                          <ScoreBar score={record.matchScore} />
-
-                          {/* Matched skills */}
+                          <div className="flex items-center justify-center">
+                            <CircularGauge
+                              score={record.matchScore}
+                              size={40}
+                            />
+                          </div>
                           <SkillList
                             skills={record.matchedSkills}
                             variant="matched"
                           />
-
-                          {/* Missing skills */}
                           <SkillList
                             skills={record.missingSkills}
                             variant="missing"
                           />
-
-                          {/* Date */}
                           <span className="text-xs text-muted-foreground">
                             {formatDate(record.createdAt)}
                           </span>

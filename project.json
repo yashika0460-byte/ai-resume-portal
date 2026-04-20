@@ -1,25 +1,29 @@
 {
-  "overview": "AI Resume Screening Portal — upload PDF resumes, extract and score skills, match against job descriptions, and manage candidates via an admin dashboard with analytics, CSV export, and role-based access.",
+  "overview": "AI Resume Screening Portal — a production-grade, next-generation SaaS application for intelligent resume analysis. Upload PDF resumes for advanced NLP-based skill extraction and scoring, match candidates to job descriptions, and manage candidates via a comprehensive admin portal. Features a dark AI-themed design with glass-morphism cards, circular score gauges, color-coded skill chips, sidebar navigation, and a professional hero landing page.",
   "features": [
-    "PDF resume upload with drag-and-drop",
-    "44-skill keyword extraction and auto-scoring",
-    "Admin dashboard with sortable/filterable candidate table",
-    "Job description matching with matched/missing skill breakdown",
-    "Bar chart analytics and CSV export",
-    "User registration and email/password login",
-    "Role-based routing (admin vs user)",
-    "Glass-morphism dark theme with cyan accent",
-    "Install to home screen guide"
+    "Hero landing page with animated stats and CTA buttons",
+    "Dark AI-themed gradient with glass-morphism cards",
+    "Circular score gauge with animated fill",
+    "Color-coded skill chips (Technical, Tools, Soft Skills)",
+    "Sidebar navigation for users and admins",
+    "Job matching with circular gauge visualization",
+    "Timeline-style upload history with score trend chart",
+    "Admin portal: KPI cards, candidate table with status badges, Charts",
+    "Candidate status badges (Shortlisted, Reviewed, Pending)",
+    "Math CAPTCHA registration and security question password recovery",
+    "Fully responsive mobile-first design",
+    "Back arrow navigation on all post-login pages"
   ],
   "category": "productivity",
   "tags": [
     "resume",
     "ai",
+    "nlp",
     "hr",
     "recruitment",
-    "skill-matching",
-    "analytics",
-    "dashboard"
+    "saas",
+    "dark-theme",
+    "analytics"
   ],
-  "last_updated": "2026-04-11T04:43:45.891Z"
+  "last_updated": "2026-04-19T07:37:50.439Z"
 }

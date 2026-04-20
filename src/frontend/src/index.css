@@ -5,106 +5,128 @@
 @layer base {
   :root {
     --font-display: "Space Grotesk", sans-serif;
-    --font-body: "Figtree", sans-serif;
+    --font-body: "General Sans", sans-serif;
     --font-mono: "JetBrains Mono", monospace;
     --radius: 0.75rem;
 
-    /* ── Light AI theme — soft sky-blue / lavender professional palette ── */
+    /* ── Dark AI theme — deep navy to indigo gradient with vibrant accents ── */
 
-    /* Page & surface backgrounds */
-    --background: 0.96 0.008 240;
-    --foreground: 0.15 0.015 240;
+    /* Page & surface backgrounds — dark navy base */
+    --background: 0.08 0.015 264;
+    --foreground: 0.95 0.01 264;
 
-    /* Card surfaces */
-    --card: 0.98 0.005 240;
-    --card-foreground: 0.12 0.015 240;
+    /* Card surfaces — slightly elevated from background */
+    --card: 0.13 0.012 264;
+    --card-foreground: 0.93 0.008 264;
 
-    /* Popover */
-    --popover: 0.98 0.006 240;
-    --popover-foreground: 0.12 0.015 240;
+    /* Popover — elevated card surface */
+    --popover: 0.16 0.014 264;
+    --popover-foreground: 0.92 0.01 264;
 
-    /* Primary — rich blue, readable on light */
-    --primary: 0.44 0.2 246;
-    --primary-foreground: 0.98 0.004 240;
+    /* Primary — vibrant indigo, core action color */
+    --primary: 0.53 0.22 264;
+    --primary-foreground: 0.98 0.002 264;
 
-    /* Secondary — soft blue-grey */
-    --secondary: 0.9 0.012 240;
-    --secondary-foreground: 0.22 0.015 240;
+    /* Secondary — violet for secondary actions */
+    --secondary: 0.56 0.2 300;
+    --secondary-foreground: 0.97 0.004 264;
 
-    /* Muted — near-white tinted */
-    --muted: 0.92 0.008 240;
-    --muted-foreground: 0.48 0.012 240;
+    /* Muted — desaturated dark grey */
+    --muted: 0.25 0.01 264;
+    --muted-foreground: 0.68 0.01 264;
 
-    /* Accent — teal/AI blue — core identity color */
-    --accent: 0.52 0.18 198;
-    --accent-foreground: 0.98 0.004 198;
+    /* Accent — violet glow, UI highlights, active states */
+    --accent: 0.62 0.22 300;
+    --accent-foreground: 0.98 0.002 264;
 
-    /* Destructive */
-    --destructive: 0.55 0.22 25;
-    --destructive-foreground: 0.98 0 0;
+    /* Success — emerald for positive states */
+    --success: 0.54 0.2 151;
+    --success-foreground: 0.98 0.002 264;
+
+    /* Warning — amber for caution */
+    --warning: 0.65 0.18 79;
+    --warning-foreground: 0.08 0.01 264;
+
+    /* Destructive — red for errors */
+    --destructive: 0.62 0.22 22;
+    --destructive-foreground: 0.98 0.002 264;
 
     /* Borders & inputs */
-    --border: 0.82 0.012 240;
-    --input: 0.88 0.01 240;
-    --ring: 0.52 0.18 246;
+    --border: 0.18 0.012 264;
+    --input: 0.15 0.01 264;
+    --ring: 0.62 0.22 300;
 
     /* Chart colors */
-    --chart-1: 0.44 0.2 246;
-    --chart-2: 0.52 0.18 198;
-    --chart-3: 0.55 0.16 280;
-    --chart-4: 0.62 0.18 16;
-    --chart-5: 0.7 0.16 70;
+    --chart-1: 0.53 0.22 264;
+    --chart-2: 0.62 0.22 300;
+    --chart-3: 0.54 0.2 151;
+    --chart-4: 0.65 0.18 79;
+    --chart-5: 0.62 0.22 22;
 
     /* Sidebar — admin portal navigation */
-    --sidebar: 0.88 0.015 246;
-    --sidebar-foreground: 0.15 0.015 240;
-    --sidebar-primary: 0.52 0.18 198;
-    --sidebar-primary-foreground: 0.98 0.004 198;
-    --sidebar-accent: 0.52 0.18 198;
-    --sidebar-accent-foreground: 0.98 0.004 240;
-    --sidebar-border: 0.78 0.012 240;
-    --sidebar-ring: 0.52 0.18 198;
+    --sidebar: 0.11 0.012 264;
+    --sidebar-foreground: 0.93 0.008 264;
+    --sidebar-primary: 0.53 0.22 264;
+    --sidebar-primary-foreground: 0.98 0.002 264;
+    --sidebar-accent: 0.62 0.22 300;
+    --sidebar-accent-foreground: 0.98 0.002 264;
+    --sidebar-border: 0.16 0.01 264;
+    --sidebar-ring: 0.62 0.22 300;
 
     /* Admin-specific tokens */
-    --admin-header: 0.97 0.008 240;
-    --admin-nav-hover: 0.92 0.01 240;
-    --admin-nav-active: 0.52 0.18 198;
+    --admin-header: 0.12 0.013 264;
+    --admin-nav-hover: 0.16 0.012 264;
+    --admin-nav-active: 0.62 0.22 300;
+
+    /* Gradient & glow utilities */
+    --gradient-primary: linear-gradient(
+      135deg,
+      oklch(0.08 0.015 264) 0%,
+      oklch(0.11 0.018 280) 50%,
+      oklch(0.13 0.014 300) 100%
+    );
+    --glow-indigo: 0 0 20px oklch(0.53 0.22 264 / 0.3);
+    --glow-violet: 0 0 24px oklch(0.62 0.22 300 / 0.35);
   }
 
-  /* Dark mode override (if ever toggled) */
+  /* Dark mode is default; this mirrors :root as confirmation */
   .dark {
-    --background: 0.08 0.012 240;
-    --foreground: 0.95 0.008 240;
-    --card: 0.13 0.012 245;
-    --card-foreground: 0.93 0.008 240;
-    --popover: 0.16 0.016 245;
-    --popover-foreground: 0.92 0.008 240;
-    --primary: 0.58 0.18 246;
-    --primary-foreground: 0.97 0.005 240;
-    --secondary: 0.48 0.14 280;
-    --secondary-foreground: 0.92 0.008 240;
-    --muted: 0.22 0.012 240;
-    --muted-foreground: 0.62 0.02 240;
-    --accent: 0.72 0.18 198;
-    --accent-foreground: 0.06 0.012 240;
-    --destructive: 0.63 0.22 16;
-    --destructive-foreground: 0.95 0.008 240;
-    --border: 0.22 0.012 240;
-    --input: 0.19 0.012 240;
-    --ring: 0.72 0.18 198;
-    --chart-1: 0.58 0.18 246;
-    --chart-2: 0.72 0.18 198;
-    --chart-3: 0.48 0.14 280;
-    --chart-4: 0.65 0.18 16;
-    --chart-5: 0.72 0.16 70;
-    --sidebar: 0.13 0.014 242;
-    --sidebar-foreground: 0.93 0.008 240;
-    --sidebar-primary: 0.72 0.18 198;
-    --sidebar-primary-foreground: 0.95 0.005 240;
-    --sidebar-accent: 0.72 0.18 198;
-    --sidebar-accent-foreground: 0.08 0.012 240;
-    --sidebar-border: 0.18 0.012 240;
-    --sidebar-ring: 0.72 0.18 198;
+    --background: 0.08 0.015 264;
+    --foreground: 0.95 0.01 264;
+    --card: 0.13 0.012 264;
+    --card-foreground: 0.93 0.008 264;
+    --popover: 0.16 0.014 264;
+    --popover-foreground: 0.92 0.01 264;
+    --primary: 0.53 0.22 264;
+    --primary-foreground: 0.98 0.002 264;
+    --secondary: 0.56 0.2 300;
+    --secondary-foreground: 0.97 0.004 264;
+    --muted: 0.25 0.01 264;
+    --muted-foreground: 0.68 0.01 264;
+    --accent: 0.62 0.22 300;
+    --accent-foreground: 0.98 0.002 264;
+    --success: 0.54 0.2 151;
+    --success-foreground: 0.98 0.002 264;
+    --warning: 0.65 0.18 79;
+    --warning-foreground: 0.08 0.01 264;
+    --destructive: 0.62 0.22 22;
+    --destructive-foreground: 0.98 0.002 264;
+    --border: 0.18 0.012 264;
+    --input: 0.15 0.01 264;
+    --ring: 0.62 0.22 300;
+    --chart-1: 0.53 0.22 264;
+    --chart-2: 0.62 0.22 300;
+    --chart-3: 0.54 0.2 151;
+    --chart-4: 0.65 0.18 79;
+    --chart-5: 0.62 0.22 22;
+    --sidebar: 0.11 0.012 264;
+    --sidebar-foreground: 0.93 0.008 264;
+    --sidebar-primary: 0.53 0.22 264;
+    --sidebar-primary-foreground: 0.98 0.002 264;
+    --sidebar-accent: 0.62 0.22 300;
+    --sidebar-accent-foreground: 0.98 0.002 264;
+    --sidebar-border: 0.16 0.01 264;
+    --sidebar-ring: 0.62 0.22 300;
   }
 
   * {
@@ -112,27 +134,26 @@
   }
 
   html {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
   body {
     @apply bg-background text-foreground font-body antialiased;
   }
 
-  /* Light scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: oklch(0.93 0.008 240);
+    background: oklch(0.12 0.012 264);
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.7 0.014 240);
-    border-radius: 3px;
+    background: oklch(0.3 0.04 264);
+    border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.52 0.18 198);
+    background: oklch(0.53 0.22 264);
   }
 }
 
@@ -141,14 +162,14 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Glass-morphism — light frosted glass */
+  /* Glass-morphism — dark frosted glass with glow */
   .glass {
-    background-color: oklch(1 0 0 / 0.65);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid oklch(1 0 0 / 0.85);
-    box-shadow: 0 4px 24px oklch(0.52 0.14 240 / 0.1), 0 1px 0
-      oklch(1 0 0 / 0.8) inset;
+    background-color: oklch(0.13 0.012 264 / 0.5);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1.5px solid oklch(0.53 0.22 264 / 0.2);
+    box-shadow: 0 8px 32px oklch(0 0 0 / 0.4), inset 0 1px 0 oklch(1 0 0 / 0.05),
+      0 0 20px oklch(0.53 0.22 264 / 0.1);
   }
 
   .glass-hover {
@@ -156,44 +177,63 @@
   }
 
   .glass-hover:hover {
-    background-color: oklch(1 0 0 / 0.8);
-    border-color: oklch(0.52 0.18 198 / 0.4);
-    box-shadow: 0 6px 28px oklch(0.52 0.14 240 / 0.14);
+    background-color: oklch(0.16 0.014 264 / 0.65);
+    border-color: oklch(0.62 0.22 300 / 0.3);
+    box-shadow: 0 12px 40px oklch(0 0 0 / 0.5), inset 0 1px 0
+      oklch(1 0 0 / 0.08), 0 0 30px oklch(0.62 0.22 300 / 0.15);
   }
 
   /* Deep AI/tech dark gradient page background */
   .gradient-flow {
     background: linear-gradient(
       135deg,
-      oklch(0.18 0.045 264) 0%,
-      oklch(0.14 0.038 280) 35%,
-      oklch(0.12 0.032 245) 65%,
-      oklch(0.16 0.042 260) 100%
+      oklch(0.08 0.015 264) 0%,
+      oklch(0.1 0.016 280) 25%,
+      oklch(0.09 0.014 300) 50%,
+      oklch(0.11 0.015 270) 75%,
+      oklch(0.08 0.015 264) 100%
     );
   }
 
-  /* Subtle neural-net dot grid overlay */
+  /* Animated neural-net tech grid overlay */
   .bg-grid-pattern {
-    background-image: radial-gradient(
-      circle,
-      oklch(0.72 0.14 210 / 0.12) 1px,
-      transparent 1px
-    );
-    background-size: 32px 32px;
+    background-image: linear-gradient(
+        0deg,
+        oklch(0.53 0.22 264 / 0.03) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, oklch(0.53 0.22 264 / 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: grid-drift 20s linear infinite;
   }
 
-  /* Teal accent glow — softer for light mode */
+  @keyframes grid-drift {
+    0% {
+      background-position: 0 0;
+    }
+    100% {
+      background-position: 40px 40px;
+    }
+  }
+
+  /* Indigo accent glow — core highlight */
   .accent-glow {
-    box-shadow: 0 0 20px oklch(0.52 0.18 198 / 0.25);
+    box-shadow: 0 0 24px oklch(0.53 0.22 264 / 0.3), 0 0 12px
+      oklch(0.53 0.22 264 / 0.15);
   }
 
-  /* Score bar fill */
+  .accent-glow-violet {
+    box-shadow: 0 0 28px oklch(0.62 0.22 300 / 0.35), 0 0 14px
+      oklch(0.62 0.22 300 / 0.18);
+  }
+
+  /* Score bar fill — dark themed */
   .score-bar {
-    @apply h-1.5 rounded-full bg-accent/15 overflow-hidden;
+    @apply h-2 rounded-full bg-muted/20 overflow-hidden border border-primary/10;
   }
 
   .score-bar-fill {
-    @apply h-full rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-700;
+    @apply h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-700;
   }
 
   /* Status indicator dot */
@@ -217,13 +257,13 @@
     }
   }
 
-  /* Shimmer for loading states — light version */
+  /* Shimmer for loading states — dark version */
   .shimmer {
     background: linear-gradient(
       90deg,
-      oklch(0.92 0.008 240) 0%,
-      oklch(0.96 0.01 240) 50%,
-      oklch(0.92 0.008 240) 100%
+      oklch(0.13 0.012 264) 0%,
+      oklch(0.18 0.015 264) 50%,
+      oklch(0.13 0.012 264) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
@@ -291,8 +331,8 @@
 }
 
 @font-face {
-  font-family: "Figtree";
-  src: url("/assets/fonts/Figtree.woff2") format("woff2");
+  font-family: "General Sans";
+  src: url("/assets/fonts/GeneralSans.woff2") format("woff2");
   font-weight: 300 700;
   font-style: normal;
   font-display: swap;

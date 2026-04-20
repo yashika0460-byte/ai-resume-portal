@@ -4,6 +4,7 @@ interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg";
   label?: string;
   className?: string;
+  overlay?: boolean;
 }
 
 const sizeMap = {
@@ -22,19 +23,20 @@ export function LoadingSpinner({
   size = "md",
   label,
   className,
+  overlay = false,
 }: LoadingSpinnerProps) {
-  return (
+  const inner = (
     <div
       className={cn(
         "flex flex-col items-center justify-center gap-3",
-        className,
+        !overlay && className,
       )}
       aria-label={label ?? "Loading"}
       aria-busy="true"
     >
       <span
         className={cn(
-          "block rounded-full border-border/30 border-t-accent animate-spin",
+          "block rounded-full border-primary/20 border-t-primary animate-spin",
           sizeMap[size],
         )}
         aria-hidden="true"
@@ -48,9 +50,25 @@ export function LoadingSpinner({
       )}
     </div>
   );
+
+  if (overlay) {
+    return (
+      <div
+        className={cn(
+          "fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm",
+          className,
+        )}
+      >
+        {inner}
+      </div>
+    );
+  }
+
+  return inner;
 }
 
-// Skeleton block for content placeholders
+// ── Skeleton block ────────────────────────────────────────────────────────────
+
 interface SkeletonProps {
   className?: string;
 }

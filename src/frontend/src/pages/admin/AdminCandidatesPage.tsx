@@ -1,14 +1,13 @@
 /**
- * AdminCandidatesPage — full candidate management page.
+ * AdminCandidatesPage — full candidate management page with status badges.
  *
  * Features:
- * - Sortable table with rank, filename, score bar, skills chips, date, actions
- * - Filter bar: text search, score range, skill filter, date range (URL-synced)
- * - Checkbox select + bulk actions (delete, CSV export)
+ * - Dark styled table with status badges (Shortlisted=emerald, Reviewed=slate, Pending=amber)
+ * - Sortable columns with dark header row + alternating rows
+ * - Text search, score range, skill filter, date range filters
+ * - Checkbox bulk select + bulk delete + CSV export
  * - Individual row: delete (confirm modal), download PDF
- * - Pagination (20/page, URL-synced)
- * - Loading skeletons + empty states
- * - Optimistic delete
+ * - Pagination (20/page)
  */
 
 import {
@@ -41,7 +40,6 @@ import {
   ArrowUp,
   ArrowUpDown,
   Briefcase,
-  ChevronLeft,
   Download,
   FileDown,
   Search,
@@ -58,20 +56,9 @@ const SKELETON_KEYS = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"] as const;
 
 type SortField = "rank" | "filename" | "score" | "uploadDate";
 type SortDir = "asc" | "desc";
+type CandidateStatus = "Pending" | "Reviewed" | "Shortlisted";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function scoreColor(score: number): string {
-  if (score <= 40) return "bg-destructive";
-  if (score <= 70) return "bg-yellow-500";
-  return "bg-green-500";
-}
-
-function scoreLabel(score: number): string {
-  if (score <= 40) return "text-destructive";
-  if (score <= 70) return "text-yellow-600";
-  return "text-green-600";
-}
 
 function formatDate(iso: string): string {
   try {
@@ -104,19 +91,65 @@ function exportCSV(rows: Resume[], filename = "candidates.csv") {
   URL.revokeObjectURL(url);
 }
 
-// ─── Score bar cell ────────────────────────────────────────────────────────────
+// ─── Status Badge ──────────────────────────────────────────────────────────────
 
-function ScoreBar({ score }: { score: number }) {
+function StatusBadge({
+  status,
+  onChange,
+  rank,
+}: {
+  status: CandidateStatus;
+  onChange: (s: CandidateStatus) => void;
+  rank: number;
+}) {
+  const styles: Record<CandidateStatus, string> = {
+    Shortlisted: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+    Reviewed: "bg-muted/50 text-muted-foreground border-muted/30",
+    Pending: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+  };
+
+  const next: Record<CandidateStatus, CandidateStatus> = {
+    Pending: "Reviewed",
+    Reviewed: "Shortlisted",
+    Shortlisted: "Pending",
+  };
+
   return (
-    <div className="flex items-center gap-2 min-w-[100px]">
-      <span
-        className={`text-sm font-mono font-semibold w-8 shrink-0 ${scoreLabel(score)}`}
-      >
+    <button
+      type="button"
+      onClick={() => onChange(next[status])}
+      data-ocid={`admin-candidates.status_badge.${rank}`}
+      title="Click to cycle status"
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border transition-all duration-200 hover:scale-105 cursor-pointer ${styles[status]}`}
+    >
+      {status}
+    </button>
+  );
+}
+
+// ─── Score cell ────────────────────────────────────────────────────────────────
+
+function ScoreCell({ score }: { score: number }) {
+  const color =
+    score >= 70
+      ? "text-emerald-400"
+      : score >= 40
+        ? "text-amber-400"
+        : "text-red-400";
+  const barColor =
+    score >= 70
+      ? "bg-emerald-500"
+      : score >= 40
+        ? "bg-amber-400"
+        : "bg-red-500";
+  return (
+    <div className="flex items-center gap-2 min-w-[110px]">
+      <span className={`text-sm font-mono font-bold w-7 shrink-0 ${color}`}>
         {score}
       </span>
-      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full bg-muted/30 overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-700 ${scoreColor(score)}`}
+          className={`h-full rounded-full transition-all duration-700 ${barColor}`}
           style={{ width: `${score}%` }}
         />
       </div>
@@ -127,21 +160,19 @@ function ScoreBar({ score }: { score: number }) {
 // ─── Skills chips ──────────────────────────────────────────────────────────────
 
 function SkillChips({ skills }: { skills: string[] }) {
-  const MAX_VISIBLE = 5;
+  const MAX_VISIBLE = 4;
   const visible = skills.slice(0, MAX_VISIBLE);
   const overflow = skills.length - MAX_VISIBLE;
-
   if (skills.length === 0)
     return <span className="text-muted-foreground text-xs italic">—</span>;
-
   return (
     <TooltipProvider>
-      <div className="flex flex-wrap gap-1 max-w-[260px]">
+      <div className="flex flex-wrap gap-1 max-w-[240px]">
         {visible.map((s) => (
           <Badge
             key={s}
             variant="secondary"
-            className="text-[10px] px-1.5 py-0 font-mono"
+            className="text-[10px] px-1.5 py-0 font-mono bg-indigo-500/10 text-indigo-300 border-indigo-500/20"
           >
             {s}
           </Badge>
@@ -151,7 +182,7 @@ function SkillChips({ skills }: { skills: string[] }) {
             <TooltipTrigger asChild>
               <Badge
                 variant="outline"
-                className="text-[10px] px-1.5 py-0 cursor-default"
+                className="text-[10px] px-1.5 py-0 cursor-default border-border/30 text-muted-foreground"
               >
                 +{overflow}
               </Badge>
@@ -200,6 +231,9 @@ function SkeletonRow() {
         <Skeleton className="w-20 h-4 rounded" />
       </td>
       <td className="px-4 py-3">
+        <Skeleton className="w-20 h-4 rounded" />
+      </td>
+      <td className="px-4 py-3">
         <Skeleton className="w-16 h-4 rounded" />
       </td>
     </tr>
@@ -208,13 +242,7 @@ function SkeletonRow() {
 
 // ─── Sort indicator ────────────────────────────────────────────────────────────
 
-function SortIcon({
-  active,
-  dir,
-}: {
-  active: boolean;
-  dir: SortDir;
-}) {
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ArrowUpDown className="size-3 opacity-30" />;
   return dir === "asc" ? (
     <ArrowUp className="size-3 text-accent" />
@@ -230,9 +258,7 @@ export default function AdminCandidatesPage() {
   const deleteResume = useDeleteResume();
   const queryClient = useQueryClient();
 
-  // ── URL search param state ─────────────────────────────────────────────────
   const getParams = () => new URLSearchParams(window.location.search);
-
   const [search, setSearch] = useState(() => getParams().get("q") ?? "");
   const [minScore, setMinScore] = useState(
     () => getParams().get("minScore") ?? "",
@@ -257,14 +283,16 @@ export default function AdminCandidatesPage() {
     Number(getParams().get("page") ?? "1"),
   );
 
-  // ── Selection state ────────────────────────────────────────────────────────
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Status map — keyed by resume.id, value is CandidateStatus
+  const [statusMap, setStatusMap] = useState<Map<string, CandidateStatus>>(
+    new Map(),
+  );
 
-  // ── Delete modal ───────────────────────────────────────────────────────────
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null); // single delete
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  // ── Sync URL params ────────────────────────────────────────────────────────
+  // Sync URL params
   const syncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (syncTimeout.current) clearTimeout(syncTimeout.current);
@@ -298,7 +326,7 @@ export default function AdminCandidatesPage() {
     page,
   ]);
 
-  // ── Filter + sort pipeline ────────────────────────────────────────────────
+  // Filter + sort pipeline
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     const skillTerms = skillFilter
@@ -309,7 +337,6 @@ export default function AdminCandidatesPage() {
     const max = maxScore !== "" ? Number(maxScore) : null;
     const from = dateFrom ? new Date(dateFrom).getTime() : null;
     const to = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
-
     return resumes.filter((r) => {
       if (q && !r.filename.toLowerCase().includes(q)) return false;
       if (min !== null && r.score < min) return false;
@@ -338,7 +365,6 @@ export default function AdminCandidatesPage() {
       else if (sortField === "uploadDate")
         cmp =
           new Date(a.uploadDate).getTime() - new Date(b.uploadDate).getTime();
-      else cmp = 0; // rank — keep natural order
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
@@ -351,7 +377,6 @@ export default function AdminCandidatesPage() {
     currentPage * PAGE_SIZE,
   );
 
-  // Reset page to 1 when filters change
   const prevFiltered = useRef(filtered.length);
   useEffect(() => {
     if (prevFiltered.current !== filtered.length) {
@@ -360,12 +385,11 @@ export default function AdminCandidatesPage() {
     }
   }, [filtered.length]);
 
-  // ── Sort toggle ────────────────────────────────────────────────────────────
   const toggleSort = useCallback(
     (field: SortField) => {
-      if (sortField === field) {
+      if (sortField === field)
         setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-      } else {
+      else {
         setSortField(field);
         setSortDir("desc");
       }
@@ -373,7 +397,6 @@ export default function AdminCandidatesPage() {
     [sortField],
   );
 
-  // ── Selection helpers ──────────────────────────────────────────────────────
   const allPageSelected =
     pageItems.length > 0 && pageItems.every((r) => selected.has(r.id));
   const someSelected = selected.size > 0;
@@ -403,9 +426,15 @@ export default function AdminCandidatesPage() {
     });
   };
 
-  // ── Delete handlers ────────────────────────────────────────────────────────
+  const setStatus = (id: string, status: CandidateStatus) => {
+    setStatusMap((prev) => {
+      const next = new Map(prev);
+      next.set(id, status);
+      return next;
+    });
+  };
+
   const handleDelete = async (id: string) => {
-    // Optimistic: remove from cache immediately
     queryClient.setQueryData<Resume[]>(["resumes"], (old = []) =>
       old.filter((r) => r.id !== id),
     );
@@ -416,14 +445,12 @@ export default function AdminCandidatesPage() {
     });
     setDeleteTarget(null);
     await deleteResume.mutateAsync(id).catch(() => {
-      // On error, refetch to restore state
       queryClient.invalidateQueries({ queryKey: ["resumes"] });
     });
   };
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selected);
-    // Optimistic: remove all from cache
     queryClient.setQueryData<Resume[]>(["resumes"], (old = []) =>
       old.filter((r) => !ids.includes(r.id)),
     );
@@ -436,20 +463,14 @@ export default function AdminCandidatesPage() {
     );
   };
 
-  // ── CSV export ─────────────────────────────────────────────────────────────
-  const exportSelected = () => {
-    const rows = sorted.filter((r) => selected.has(r.id));
-    exportCSV(rows, "selected-candidates.csv");
-  };
-
-  const exportFiltered = () => {
-    exportCSV(sorted, "candidates.csv");
-  };
-
-  // ── Reset filters ──────────────────────────────────────────────────────────
+  const exportSelected = () =>
+    exportCSV(
+      sorted.filter((r) => selected.has(r.id)),
+      "selected-candidates.csv",
+    );
+  const exportFiltered = () => exportCSV(sorted, "candidates.csv");
   const hasFilters =
     search || minScore || maxScore || skillFilter || dateFrom || dateTo;
-
   const clearFilters = () => {
     setSearch("");
     setMinScore("");
@@ -459,19 +480,14 @@ export default function AdminCandidatesPage() {
     setDateTo("");
   };
 
-  // ── Sortable header cell ───────────────────────────────────────────────────
   const Th = ({
     field,
     label,
     className = "",
-  }: {
-    field: SortField;
-    label: string;
-    className?: string;
-  }) => (
+  }: { field: SortField; label: string; className?: string }) => (
     <th
       scope="col"
-      className={`px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer select-none group ${className}`}
+      className={`px-4 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer select-none ${className}`}
       onClick={() => toggleSort(field)}
       onKeyDown={(e) =>
         (e.key === "Enter" || e.key === " ") && toggleSort(field)
@@ -496,18 +512,7 @@ export default function AdminCandidatesPage() {
       className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-5 fade-up"
       data-ocid="admin-candidates.page"
     >
-      {/* ── Back button ── */}
-      <button
-        type="button"
-        onClick={() => window.history.back()}
-        aria-label="Go back"
-        data-ocid="admin-candidates.back_button"
-        className="fixed top-4 left-4 z-50 flex items-center justify-center size-9 rounded-xl bg-muted/30 border border-border/40 text-muted-foreground hover:text-accent hover:border-accent/50 hover:bg-accent/10 backdrop-blur-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-      >
-        <ChevronLeft className="size-5" aria-hidden="true" />
-      </button>
-
-      {/* ── Page header ── */}
+      {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="p-2.5 rounded-xl bg-accent/15 border border-accent/30 shrink-0 mt-0.5">
@@ -536,32 +541,29 @@ export default function AdminCandidatesPage() {
         </Button>
       </div>
 
-      {/* ── Filter bar ──────────────────────────────────────────────────────── */}
+      {/* Filter bar */}
       <div
         className="glass rounded-2xl p-4 border border-border/20 space-y-3"
         data-ocid="admin-candidates.filter_bar"
       >
         <div className="flex flex-wrap gap-3 items-end">
-          {/* Text search */}
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Search filename…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-sm bg-background/60"
+              className="pl-9 h-9 text-sm bg-background/40 border-border/30 focus:border-accent/40"
               data-ocid="admin-candidates.search_input"
             />
           </div>
-
-          {/* Score range */}
           <div className="flex items-center gap-2">
             <Input
               type="number"
-              placeholder="Min score"
+              placeholder="Min"
               value={minScore}
               onChange={(e) => setMinScore(e.target.value)}
-              className="w-24 h-9 text-sm bg-background/60"
+              className="w-20 h-9 text-sm bg-background/40 border-border/30"
               min={0}
               max={100}
               data-ocid="admin-candidates.min_score_input"
@@ -569,47 +571,41 @@ export default function AdminCandidatesPage() {
             <span className="text-muted-foreground text-xs">–</span>
             <Input
               type="number"
-              placeholder="Max score"
+              placeholder="Max"
               value={maxScore}
               onChange={(e) => setMaxScore(e.target.value)}
-              className="w-24 h-9 text-sm bg-background/60"
+              className="w-20 h-9 text-sm bg-background/40 border-border/30"
               min={0}
               max={100}
               data-ocid="admin-candidates.max_score_input"
             />
           </div>
-
-          {/* Skill filter */}
           <Input
             placeholder="Skills (comma-separated)"
             value={skillFilter}
             onChange={(e) => setSkillFilter(e.target.value)}
-            className="w-52 h-9 text-sm bg-background/60"
+            className="w-48 h-9 text-sm bg-background/40 border-border/30"
             data-ocid="admin-candidates.skill_filter_input"
           />
-
-          {/* Date range */}
           <Input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="w-36 h-9 text-sm bg-background/60"
+            className="w-36 h-9 text-sm bg-background/40 border-border/30"
             data-ocid="admin-candidates.date_from_input"
           />
           <Input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="w-36 h-9 text-sm bg-background/60"
+            className="w-36 h-9 text-sm bg-background/40 border-border/30"
             data-ocid="admin-candidates.date_to_input"
           />
-
-          {/* Clear filters */}
           {hasFilters && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 gap-1.5 text-muted-foreground"
+              className="h-9 gap-1.5 text-muted-foreground hover:text-foreground"
               onClick={clearFilters}
               data-ocid="admin-candidates.clear_filters_button"
             >
@@ -620,14 +616,17 @@ export default function AdminCandidatesPage() {
         </div>
       </div>
 
-      {/* ── Bulk actions toolbar ─────────────────────────────────────────────── */}
+      {/* Bulk actions toolbar */}
       {someSelected && (
         <div
           className="glass rounded-xl px-4 py-2.5 border border-accent/30 flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-200"
           data-ocid="admin-candidates.bulk_toolbar"
         >
           <span className="text-sm font-medium text-foreground">
-            <Badge variant="default" className="mr-2 font-mono">
+            <Badge
+              variant="default"
+              className="mr-2 font-mono bg-accent text-accent-foreground"
+            >
               {selected.size}
             </Badge>
             selected
@@ -657,7 +656,7 @@ export default function AdminCandidatesPage() {
         </div>
       )}
 
-      {/* ── Table ────────────────────────────────────────────────────────────── */}
+      {/* Table */}
       <div
         className="glass rounded-2xl border border-border/20 overflow-hidden"
         data-ocid="admin-candidates.table"
@@ -665,8 +664,8 @@ export default function AdminCandidatesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border/20 bg-muted/30">
-                <th className="px-4 py-3 w-10">
+              <tr className="border-b border-border/20 bg-muted/40">
+                <th className="px-4 py-3.5 w-10">
                   <Checkbox
                     checked={allPageSelected}
                     onCheckedChange={toggleAll}
@@ -677,23 +676,24 @@ export default function AdminCandidatesPage() {
                 <Th field="rank" label="#" className="w-12" />
                 <Th field="filename" label="Filename" />
                 <Th field="score" label="Score" className="w-44" />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Skills
                 </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider w-28">
+                  Status
+                </th>
                 <Th field="uploadDate" label="Uploaded" className="w-36" />
-                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">
+                <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-24">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {/* Loading skeletons */}
               {isLoading && SKELETON_KEYS.map((k) => <SkeletonRow key={k} />)}
 
-              {/* No data empty state */}
               {!isLoading && resumes.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div
                       className="flex flex-col items-center justify-center py-16 gap-3"
                       data-ocid="admin-candidates.empty_state"
@@ -705,18 +705,16 @@ export default function AdminCandidatesPage() {
                         No candidates yet
                       </p>
                       <p className="text-sm text-muted-foreground text-center max-w-xs">
-                        Candidates will appear here once resumes are uploaded
-                        through the Upload page.
+                        Candidates will appear here once resumes are uploaded.
                       </p>
                     </div>
                   </td>
                 </tr>
               )}
 
-              {/* Filtered empty state */}
               {!isLoading && resumes.length > 0 && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div
                       className="flex flex-col items-center justify-center py-12 gap-3"
                       data-ocid="admin-candidates.filter_empty_state"
@@ -738,15 +736,15 @@ export default function AdminCandidatesPage() {
                 </tr>
               )}
 
-              {/* Data rows */}
               {!isLoading &&
                 pageItems.map((resume, idx) => {
                   const rank = (currentPage - 1) * PAGE_SIZE + idx + 1;
                   const isChecked = selected.has(resume.id);
+                  const status = statusMap.get(resume.id) ?? "Pending";
                   return (
                     <tr
                       key={resume.id}
-                      className={`border-b border-border/10 transition-colors hover:bg-muted/20 ${isChecked ? "bg-accent/5" : ""}`}
+                      className={`border-b border-border/10 transition-colors duration-150 hover:bg-muted/15 ${isChecked ? "bg-accent/5" : idx % 2 === 0 ? "" : "bg-muted/5"}`}
                       data-ocid={`admin-candidates.item.${rank}`}
                     >
                       <td className="px-4 py-3">
@@ -762,7 +760,7 @@ export default function AdminCandidatesPage() {
                           {rank}
                         </span>
                       </td>
-                      <td className="px-4 py-3 max-w-[200px]">
+                      <td className="px-4 py-3 max-w-[180px]">
                         <span
                           className="font-medium text-foreground truncate block"
                           title={resume.filename}
@@ -771,10 +769,17 @@ export default function AdminCandidatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <ScoreBar score={resume.score} />
+                        <ScoreCell score={resume.score} />
                       </td>
                       <td className="px-4 py-3">
                         <SkillChips skills={resume.skills} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          status={status}
+                          onChange={(s) => setStatus(resume.id, s)}
+                          rank={rank}
+                        />
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                         {formatDate(resume.uploadDate)}
@@ -836,9 +841,9 @@ export default function AdminCandidatesPage() {
           </table>
         </div>
 
-        {/* ── Pagination ──────────────────────────────────────────────────────── */}
+        {/* Pagination */}
         {!isLoading && totalPages > 1 && (
-          <div className="px-6 py-3 border-t border-border/15 flex items-center justify-between gap-4">
+          <div className="px-6 py-3 border-t border-border/15 bg-muted/10 flex items-center justify-between gap-4">
             <span className="text-xs text-muted-foreground">
               Page {currentPage} of {totalPages} · {sorted.length} result
               {sorted.length !== 1 ? "s" : ""}
@@ -867,7 +872,7 @@ export default function AdminCandidatesPage() {
         )}
       </div>
 
-      {/* ── Single delete confirm modal ──────────────────────────────────────── */}
+      {/* Single delete confirm */}
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
@@ -895,7 +900,7 @@ export default function AdminCandidatesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Bulk delete confirm modal ────────────────────────────────────────── */}
+      {/* Bulk delete confirm */}
       <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent data-ocid="admin-candidates.bulk_delete_dialog">
           <AlertDialogHeader>
@@ -904,8 +909,7 @@ export default function AdminCandidatesPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete all {selected.size} selected resume
-              {selected.size !== 1 ? "s" : ""} and their match history. This
-              action cannot be undone.
+              {selected.size !== 1 ? "s" : ""} and their match history.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
